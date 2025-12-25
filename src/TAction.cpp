@@ -1,7 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2017, 2021 by Stephen Lyons - slysven@virginmedia.com   *
+ *   Copyright (C) 2017, 2021-2023 by Stephen Lyons                        *
+ *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -34,60 +35,14 @@
 
 TAction::TAction(TAction* parent, Host* pHost)
 : Tree<TAction>(parent)
-, mpToolBar(nullptr)
-, mpEasyButtonBar(nullptr)
-, mButtonState(false)
-, mPosX(0)
-, mPosY(0)
-, mOrientation()
-, mLocation()
-, mIsPushDownButton()
-, mNeedsToBeCompiled(true)
-, mButtonRotation()
-, mButtonColumns(1)
-, mButtonFlat()
-, mSizeX()
-, mSizeY()
-, mIsLabel(false)
-, mUseCustomLayout(false)
-, mButtonColor(QColor(Qt::white))
 , mpHost(pHost)
-, exportItem(true)
-, mModuleMasterFolder(false)
-, mToolbarLastDockArea(Qt::LeftDockWidgetArea)
-, mToolbarLastFloatingState(true)
-, mModuleMember(false)
-, mDataChanged(true)
 {
 }
 
 TAction::TAction(const QString& name, Host* pHost)
 : Tree<TAction>(nullptr)
-, mpToolBar(nullptr)
-, mpEasyButtonBar(nullptr)
-, mButtonState(false)
-, mPosX(0)
-, mPosY(0)
-, mOrientation()
-, mLocation()
-, mIsPushDownButton()
-, mNeedsToBeCompiled(true)
-, mButtonRotation()
-, mButtonColumns(1)
-, mButtonFlat()
-, mSizeX()
-, mSizeY()
-, mIsLabel(false)
-, mUseCustomLayout(false)
-, mButtonColor(QColor(Qt::white))
 , mpHost(pHost)
-, exportItem(true)
-, mModuleMasterFolder(false)
-, mToolbarLastDockArea(Qt::LeftDockWidgetArea)
-, mToolbarLastFloatingState(true)
 , mName(name)
-, mModuleMember(false)
-, mDataChanged(true)
 {
 }
 
@@ -127,7 +82,7 @@ void TAction::compileAll()
 {
     mNeedsToBeCompiled = true;
     if (!compileScript()) {
-        if (mudlet::debugMode) {
+        if (mudlet::smDebugMode) {
             TDebug(Qt::white, Qt::red) << "ERROR: Lua compile error. compiling script of action:" << mName << "\n" >> mpHost;
         }
         mOK_code = false;
@@ -141,7 +96,7 @@ void TAction::compile()
 {
     if (mNeedsToBeCompiled) {
         if (!compileScript()) {
-            if (mudlet::debugMode) {
+            if (mudlet::smDebugMode) {
                 TDebug(Qt::white, Qt::red) << "ERROR: Lua compile error. compiling script of action:" << mName << "\n" >> mpHost;
             }
             mOK_code = false;
@@ -165,10 +120,10 @@ bool TAction::setScript(const QString& script)
 
 bool TAction::compileScript()
 {
-    mFuncName = QString("Action") + QString::number(mID);
-    QString code = QString("function ") + mFuncName + QString("()\n") + mScript + QString("\nend\n");
+    mFuncName = qsl("Action%1").arg(QString::number(mID));
+    const QString code = qsl("function %1() %2\nend").arg(mFuncName, mScript);
     QString error;
-    if (mpHost->mLuaInterpreter.compile(code, error, QString("Button: ") + getName())) {
+    if (mpHost->mLuaInterpreter.compile(code, error, qsl("Button: %1").arg(getName()))) {
         mNeedsToBeCompiled = false;
         mOK_code = true;
         return true;
@@ -203,16 +158,14 @@ void TAction::execute()
 
     if (mNeedsToBeCompiled) {
         if (!compileScript()) {
-            mpHost->mpConsole->activateWindow();
-            mpHost->mpConsole->setFocus();
+            mpHost->setFocusOnHostActiveCommandLine();
             return;
         }
     }
 
     mpHost->mLuaInterpreter.call(mFuncName, mName);
     // move focus back to the active console / command line:
-    mpHost->mpConsole->activateWindow();
-    mpHost->mpConsole->setFocus();
+    mpHost->setFocusOnHostActiveCommandLine();
 }
 
 void TAction::expandToolbar(TToolBar* pT)
@@ -225,8 +178,8 @@ void TAction::expandToolbar(TToolBar* pT)
             // buttons show in a "greyed-out" state... - Slysven
             continue;
         }
-        QIcon icon(action->mIcon);
-        QString name = action->getName();
+        const QIcon icon(action->mIcon);
+        const QString name = action->getName();
         auto button = new TFlipButton(action, mpHost);
         button->setIcon(icon);
         button->setText(name);
@@ -243,17 +196,6 @@ void TAction::expandToolbar(TToolBar* pT)
         button->setFlat(mButtonFlat);
         // This applies the CSS for THIS TAction to a CHILD's representation on the Toolbar
         button->setStyleSheet(css);
-
-        /*
-         * CHECK: The other expandToolbar(...) has the following in this position:
-         *       //FIXME: Heiko April 2012: only run checkbox button scripts, but run them even if unchecked
-         *       if( action->mIsPushDownButton && mpHost->mIsProfileLoadingSequence )
-         *       {
-         *          qDebug()<<"expandToolBar() name="<<action->mName<<" executing script";
-         *          action->execute();
-         *       }
-         * Why does it have this and we do not? - Slysven
-         */
 
         if (action->isFolder()) {
             auto newMenu = new QMenu(pT);
@@ -287,11 +229,8 @@ void TAction::expandToolbar(TToolBar* pT)
 void TAction::insertActions(TToolBar* pT, QMenu* menu)
 {
     mpToolBar = pT;
-    QIcon icon(mIcon);
-    auto action = new EAction(icon, mName);
+    auto action = new EAction(mpHost, QIcon(mIcon), mName, mID);
     action->setCheckable(mIsPushDownButton);
-    action->mID = mID;
-    action->mpHost = mpHost;
     action->setStatusTip(mName);
     if (mpEButton) {
         mpEButton->deleteLater();
@@ -320,8 +259,8 @@ void TAction::expandToolbar(TEasyButtonBar* pT)
         if (!action->isActive()) {
             continue;
         }
-        QIcon icon(action->mIcon);
-        QString name = action->getName();
+        const QIcon icon(action->mIcon);
+        const QString name = action->getName();
         auto button = new TFlipButton(action, mpHost);
         button->setIcon(icon);
         button->setText(name);
@@ -386,10 +325,7 @@ void TAction::fillMenu(TEasyButtonBar* pT, QMenu* menu)
             continue;
         }
         mpEasyButtonBar = pT;
-        QIcon icon(mIcon);
-        auto newAction = new EAction(icon, action->mName);
-        newAction->mID = action->mID;
-        newAction->mpHost = mpHost;
+        auto newAction = new EAction(mpHost, QIcon(mIcon), action->mName, action->mID);
         newAction->setStatusTip(action->mName);
         newAction->setCheckable(action->mIsPushDownButton);
         if (action->mIsPushDownButton) {
@@ -433,11 +369,8 @@ void TAction::fillMenu(TEasyButtonBar* pT, QMenu* menu)
 void TAction::insertActions(TEasyButtonBar* pT, QMenu* menu)
 {
     mpEasyButtonBar = pT;
-    QIcon icon(mIcon);
-    auto action = new EAction(icon, mName);
+    auto action = new EAction(mpHost, QIcon(mIcon), mName, mID);
     action->setCheckable(mIsPushDownButton);
-    action->mID = mID;
-    action->mpHost = mpHost;
     action->setStatusTip(mName);
     if (mpEButton) {
         mpEButton->deleteLater();
@@ -458,4 +391,38 @@ void TAction::setName(const QString& name)
             mpToolBar->setName(name);
         }
     }
+}
+
+QString TAction::packageName(TAction* pAction) const
+{
+    if (!pAction) {
+        return QString();
+    }
+
+    if (!pAction->mPackageName.isEmpty()) {
+        return !mpHost->mModuleInfo.contains(pAction->mPackageName) ? pAction->mPackageName : QString();
+    }
+
+    if (pAction->getParent()) {
+        return packageName(pAction->getParent());
+    }
+
+    return QString();
+}
+
+QString TAction::moduleName(TAction* pAction) const
+{
+    if (!pAction) {
+        return QString();
+    }
+
+    if (!pAction->mPackageName.isEmpty()) {
+        return mpHost->mModuleInfo.contains(pAction->mPackageName) ? pAction->mPackageName : QString();
+    }
+
+    if (pAction->getParent()) {
+        return moduleName(pAction->getParent());
+    }
+
+    return QString();
 }

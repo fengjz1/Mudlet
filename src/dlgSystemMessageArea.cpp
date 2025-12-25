@@ -23,33 +23,22 @@
 #include "dlgSystemMessageArea.h"
 
 
-dlgSystemMessageArea::dlgSystemMessageArea(QWidget* pF) : QWidget(pF)
+dlgSystemMessageArea::dlgSystemMessageArea(QWidget* pParentWidget)
+: QWidget(pParentWidget)
 {
     // init generated dialog
     setupUi(this);
 
     QPixmap holdPixmap;
-#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 15, 0))
     holdPixmap = notificationAreaIconLabelWarning->pixmap(Qt::ReturnByValue);
-#else
-    holdPixmap = *(notificationAreaIconLabelWarning->pixmap());
-#endif
     holdPixmap.setDevicePixelRatio(5.3);
     notificationAreaIconLabelWarning->setPixmap(holdPixmap);
 
-#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 15, 0))
     holdPixmap = notificationAreaIconLabelError->pixmap(Qt::ReturnByValue);
-#else
-    holdPixmap = *(notificationAreaIconLabelError->pixmap());
-#endif
     holdPixmap.setDevicePixelRatio(5.3);
     notificationAreaIconLabelError->setPixmap(holdPixmap);
 
-#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 15, 0))
     holdPixmap = notificationAreaIconLabelInformation->pixmap(Qt::ReturnByValue);
-#else
-    holdPixmap = *(notificationAreaIconLabelInformation->pixmap());
-#endif
     holdPixmap.setDevicePixelRatio(5.3);
     notificationAreaIconLabelInformation->setPixmap(holdPixmap);
 }

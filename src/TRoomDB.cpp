@@ -1,7 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2014-2019 by Stephen Lyons - slysven@virginmedia.com    *
+ *   Copyright (C) 2014-2019, 2023 by Stephen Lyons                        *
+ *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -23,12 +24,11 @@
 
 #include "Host.h"
 #include "TArea.h"
+#include "T2DMap.h"
 #include "mudlet.h"
 
-#include "pre_guard.h"
 #include <QElapsedTimer>
 #include <QRegularExpression>
-#include "post_guard.h"
 
 const QString ROOM_UI_SHOWNAME = qsl("room.ui_showName");
 const QString ROOM_UI_NAMEPOS = qsl("room.ui_nameOffset");
@@ -37,11 +37,38 @@ const QString ROOM_UI_NAMESIZE = qsl("room.ui_nameSize");
 
 TRoomDB::TRoomDB(TMap* pMap)
 : mpMap(pMap)
-, mpTempRoomDeletionSet(nullptr)
 {
     // Ensure the default area is created, the area/areaName items that get
     // created here will get blown away when a map is loaded but that is expected...
     addArea(-1, mpMap->getDefaultAreaName());
+}
+
+TRoomDB::~TRoomDB()
+{
+    mBulkDeletionMode = true;
+
+    // Get all pointers before clearing containers to prevent lookup issues
+    QList<TRoom*> const roomList = getRoomPtrList();
+    QList<TArea*> const areaList = getAreaPtrList();
+
+    // Clear all containers first - this prevents individual destructors
+    // from trying to remove themselves from the containers (O(n²) behavior)
+    rooms.clear();
+    areas.clear();
+    entranceMap.clear();
+    areaNamesMap.clear();
+    hashToRoomID.clear();
+    roomIDToHash.clear();
+
+    // Now delete all objects - their destructors will see mBulkDeletionMode=true
+    // and skip the expensive cleanup operations
+    for (auto room : roomList) {
+        delete room;
+    }
+    for (auto area : areaList) {
+        delete area;
+    }
+
 }
 
 TRoom* TRoomDB::getRoom(int id)
@@ -63,13 +90,12 @@ bool TRoomDB::addRoom(int id)
         rooms[id]->setId(id);
         // there is no point in updating the entranceMap here, as the room has no exit information
         return true;
-    } else {
-        if (id <= 0) {
-            QString error = qsl("addRoom: illegal room id=%1. roomID must be > 0").arg(id);
-            mpMap->logError(error);
-        }
-        return false;
     }
+    if (id <= 0) {
+        QString error = qsl("addRoom: illegal room id=%1. roomID must be > 0").arg(id);
+        mpMap->logError(error);
+    }
+    return false;
 }
 
 bool TRoomDB::addRoom(int id, TRoom* pR, bool isMapLoading)
@@ -79,15 +105,14 @@ bool TRoomDB::addRoom(int id, TRoom* pR, bool isMapLoading)
         pR->setId(id);
         updateEntranceMap(pR, isMapLoading);
         return true;
-    } else {
-        return false;
     }
+    return false;
 }
 
 void TRoomDB::deleteValuesFromEntranceMap(int value)
 {
-    QList<int> keyList = entranceMap.keys();
-    QList<int> valueList = entranceMap.values();
+    QList<int> const keyList = entranceMap.keys();
+    QList<int> const valueList = entranceMap.values();
     QList<uint> deleteEntries;
     int index = valueList.indexOf(value);
     while (index != -1) {
@@ -103,8 +128,8 @@ void TRoomDB::deleteValuesFromEntranceMap(QSet<int>& valueSet)
 {
     QElapsedTimer timer;
     timer.start();
-    QList<int> keyList = entranceMap.keys();
-    QList<int> valueList = entranceMap.values();
+    QList<int> const keyList = entranceMap.keys();
+    QList<int> const valueList = entranceMap.values();
     QList<uint> deleteEntries;
     for (auto roomId : valueSet) {
         int index = valueList.indexOf(roomId);
@@ -113,7 +138,7 @@ void TRoomDB::deleteValuesFromEntranceMap(QSet<int>& valueSet)
             index = valueList.indexOf(roomId, index + 1);
         }
     }
-    for (unsigned int entry : deleteEntries) {
+    for (unsigned const int entry : deleteEntries) {
         entranceMap.remove(keyList.at(entry), valueList.at(entry));
     }
     qDebug() << "TRoomDB::deleteValuesFromEntranceMap() with a list of:" << valueSet.size() << "items, run time:" << timer.nsecsElapsed() * 1.0e-9 << "sec.";
@@ -127,7 +152,7 @@ void TRoomDB::updateEntranceMap(int id)
 
 void TRoomDB::updateEntranceMap(TRoom* pR, bool isMapLoading)
 {
-    static bool showDebug = false; // Enable this at runtime (set a breakpoint on it) for debugging!
+    static const bool showDebug = false; // Enable this at runtime (set a breakpoint on it) for debugging!
 
     // entranceMap maps the room to rooms it has a viable exit to. So if room b and c both have
     // an exit to room a, upon deleting room a we want a map that allows us to find
@@ -135,9 +160,9 @@ void TRoomDB::updateEntranceMap(TRoom* pR, bool isMapLoading)
     // So we create a mapping like: {room_a: room_b, room_a: room_c}. This allows us to delete
     // rooms and know which other rooms are impacted by this change in a single lookup.
     if (pR) {
-        int id = pR->getId();
-        QHash<int, int> exits = pR->getExits();
-        QList<int> toExits = exits.keys();
+        const int id = pR->getId();
+        QHash<int, int> const exits = pR->getExits();
+        QList<int> const toExits = exits.keys();
         QString values;
         // to update this we need to iterate the entire entranceMap and remove invalid
         // connections. I'm not sure if this is efficient for every update, and given
@@ -150,7 +175,7 @@ void TRoomDB::updateEntranceMap(TRoom* pR, bool isMapLoading)
         if (!isMapLoading) {
             deleteValuesFromEntranceMap(id); // When LOADING a map, will never need to do this
         }
-        for (int toExit : toExits) {
+        for (const int toExit : toExits) {
             if (showDebug) {
                 values.append(qsl("%1,").arg(toExit));
             }
@@ -258,11 +283,11 @@ bool TRoomDB::__removeRoom(int id)
         }
         rooms.remove(id);
         if (roomIDToHash.contains(id)) {
-            QString hash = roomIDToHash[id];
+            const QString hash = roomIDToHash[id];
             roomIDToHash.remove(id);
             hashToRoomID.remove(hash);
         }
-        int areaID = pR->getArea();
+        const int areaID = pR->getArea();
         TArea* pA = getArea(areaID);
         if (pA) {
             pA->removeRoom(id);
@@ -286,8 +311,8 @@ bool TRoomDB::removeRoom(int id)
         if (mpMap->mRoomIdHash.value(mpMap->mProfileName) == id) {
             // Now we store mRoomId for each profile, we must remove any where
             // this room was used
-            QList<QString> profilesWithUserInThisRoom = mpMap->mRoomIdHash.keys(id);
-            for (auto key : profilesWithUserInThisRoom) {
+            QList<QString> const profilesWithUserInThisRoom = mpMap->mRoomIdHash.keys(id);
+            for (const auto& key : profilesWithUserInThisRoom) {
                 mpMap->mRoomIdHash[key] = 0;
             }
         }
@@ -295,7 +320,9 @@ bool TRoomDB::removeRoom(int id)
             mpMap->mTargetID = 0;
         }
         TRoom* pR = getRoom(id);
-        delete pR;
+        if (pR) {
+            delete pR;
+        }
         return true;
     }
     return false;
@@ -313,9 +340,9 @@ void TRoomDB::removeRoom(QSet<int>& ids)
                                   // type argument IS NOT CONSTANT - it is
                                   // ALTERED by TArea::removeRoom( int room )
                                   // for each room that is removed
-    quint64 roomcount = mpTempRoomDeletionSet->size();
+    quint64 const roomcount = mpTempRoomDeletionSet->size();
     while (!mpTempRoomDeletionSet->isEmpty()) {
-        int deleteRoomId = *(mpTempRoomDeletionSet->constBegin());
+        const int deleteRoomId = *(mpTempRoomDeletionSet->constBegin());
         TRoom* pR = getRoom(deleteRoomId);
         if (pR) {
             deletedRoomIds.insert(deleteRoomId);
@@ -362,9 +389,8 @@ bool TRoomDB::removeArea(const QString& name)
 {
     if (areaNamesMap.values().contains(name)) {
         return removeArea(areaNamesMap.key(name)); // i.e. call the removeArea(int) method
-    } else {
-        return false;
     }
+    return false;
 }
 
 void TRoomDB::removeArea(TArea* pA)
@@ -374,7 +400,7 @@ void TRoomDB::removeArea(TArea* pA)
         return;
     }
 
-    int areaId = areas.key(pA, 0);
+    const int areaId = areas.key(pA, 0);
     if (areaId == areas.key(pA, -1)) {
         // By testing twice with different default keys to return if value NOT
         // found, we can be certain we have an actual valid value
@@ -396,7 +422,7 @@ void TRoomDB::buildAreas()
     QHashIterator<int, TRoom*> it(rooms);
     while (it.hasNext()) {
         it.next();
-        int id = it.key();
+        const int id = it.key();
         TRoom* pR = getRoom(id);
         if (!pR) {
             continue;
@@ -411,7 +437,7 @@ void TRoomDB::buildAreas()
     QMapIterator<int, QString> it2(areaNamesMap);
     while (it2.hasNext()) {
         it2.next();
-        int id = it2.key();
+        const int id = it2.key();
         if (!areas.contains(id)) {
             areas[id] = new TArea(mpMap, this);
         }
@@ -435,9 +461,8 @@ TArea* TRoomDB::getArea(int id)
     //area id of -1 is a room in the "void", 0 is a failure
     if (id > 0 || id == -1) {
         return areas.value(id, nullptr);
-    } else {
-        return nullptr;
     }
+    return nullptr;
 }
 
 // Used by TMap::audit() - can detect and return areas with normally invalids Id (less than -1 or zero)!
@@ -529,7 +554,7 @@ int TRoomDB::addArea(QString name)
         return 0;
     }
 
-    int areaID = createNewAreaID();
+    const int areaID = createNewAreaID();
     if (addArea(areaID)) {
         areaNamesMap[areaID] = name;
         // This will overwrite the "Unnamed Area_###" that addArea( areaID )
@@ -555,9 +580,8 @@ bool TRoomDB::addArea(int id, QString name)
             areaNamesMap[id] = name;
         }
         return true;
-    } else {
-        return false;
     }
+    return false;
 }
 
 // Used by TMap::readJsonMapFile(...) to insert an already populated area in:
@@ -623,7 +647,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             TRoom* pR = itRoom.value();
             if (!pR) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString warnMsg = tr("[ WARN ]  - Problem with data structure associated with room id: %1 - that\n"
+                    const QString warnMsg = tr("[ WARN ]  - Problem with data structure associated with room id: %1 - that\n"
                                          "room's data has been lost so the id is now being deleted.  This\n"
                                          "suggests serious problems with the currently running version of\n"
                                          "Mudlet - is your system running out of memory?")
@@ -647,13 +671,12 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                 // set of good ones already used
             }
 
-            int areaId = pR->getArea();
+            const int areaId = pR->getArea();
             areaRoomMultiHash.insert(areaId, itRoom.key());
             roomAreaHash.insert(itRoom.key(), areaId);
         }
     }
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
     // Check for existence of all areas needed by rooms
     QList<int> areaIdsFromRoomsList{areaRoomMultiHash.uniqueKeys()};
     QSet<int> areaIdSet{areaIdsFromRoomsList.begin(), areaIdsFromRoomsList.end()};
@@ -662,17 +685,9 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
     // Throw in the area Ids from the areaNamesMap:
     if (!areaNamesMap.isEmpty()) {
         QList<int> areaIdsFromAreaNamesList{areaNamesMap.keys()};
-        QSet<int> areaIdsFromAreaNamesSet{areaIdsFromAreaNamesList.begin(), areaIdsFromAreaNamesList.end()};
+        QSet<int> const areaIdsFromAreaNamesSet{areaIdsFromAreaNamesList.begin(), areaIdsFromAreaNamesList.end()};
         areaIdSet.unite(areaIdsFromAreaNamesSet);
     }
-#else
-    // Check for existence of all areas needed by rooms
-    QSet<int> areaIdSet = areaRoomMultiHash.keys().toSet();
-
-    // START OF TASK 3
-    // Throw in the area Ids from the areaNamesMap:
-    areaIdSet.unite(areaNamesMap.keys().toSet());
-#endif
 
     // Check the set of area Ids against the ones we actually have:
     QSetIterator<int> itUsedArea(areaIdSet);
@@ -680,7 +695,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
     // (and thus valid) but absent:
     QList<int> missingAreasNeeded;
     while (itUsedArea.hasNext()) {
-        int usedAreaId = itUsedArea.next();
+        const int usedAreaId = itUsedArea.next();
         if (usedAreaId < -1 || !usedAreaId) {
             areaRemapping.insert(usedAreaId, usedAreaId); // Will find new value to use later
         } else {
@@ -689,7 +704,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
 
         if (!areas.contains(usedAreaId)) {
             if (mudlet::self()->showMapAuditErrors()) {
-                QString warnMsg = tr("[ ALERT ] - Area with id: %1 expected but not found, will be created.").arg(usedAreaId);
+                const QString warnMsg = tr("[ ALERT ] - Area with id: %1 expected but not found, will be created.").arg(usedAreaId);
                 mpMap->postMessage(warnMsg);
             }
             mpMap->appendAreaErrorMsg(usedAreaId, tr("[ ALERT ] - Area with this id expected but not found, will be created."), true);
@@ -702,7 +717,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
     QMapIterator<int, TArea*> itArea(areas);
     while (itArea.hasNext()) {
         itArea.next();
-        int areaId = itArea.key();
+        const int areaId = itArea.key();
         if (areaId < -1 || !areaId) {
             areaRemapping.insert(areaId, areaId); // Will find new value to use later
         } else {
@@ -721,16 +736,16 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
     // bit of the task being addressed here is fixing
     if (!missingAreasNeeded.isEmpty()) {
         if (mudlet::self()->showMapAuditErrors()) {
-            QString alertMsg = tr("[ ALERT ] - %n area(s) detected as missing in map: adding it/them in.\n"
-                                  " Look for further messages related to the rooms that are supposed\n"
-                                  " to be in this/these area(s)...",
+            const QString alertMsg = tr("[ ALERT ] - %n area(s) detected as missing in map: adding it/them in.\n"
+                                  "Look for further messages related to the rooms that are supposed\n"
+                                  "to be in this/these area(s)...",
                                   "Making use of %n to allow quantity dependent message form 8-) !",
                                   missingAreasNeeded.count());
             mpMap->postMessage(alertMsg);
         }
         mpMap->appendErrorMsgWithNoLf(tr("[ ALERT ] - %n area(s) detected as missing in map: adding it/them in.\n"
-                                         " Look for further messages related to the rooms that is/are supposed to\n"
-                                         " be in this/these area(s)...",
+                                         "Look for further messages related to the rooms that is/are supposed to\n"
+                                         "be in this/these area(s)...",
                                          "Making use of %n to allow quantity dependent message form 8-) !",
                                          missingAreasNeeded.count()),
                                       true);
@@ -749,7 +764,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             std::sort(missingAreasNeeded.begin(), missingAreasNeeded.end());
         }
 
-        for (int newAreaId : missingAreasNeeded) {
+        for (const int newAreaId : missingAreasNeeded) {
             // This will create a new "Default" area name if there is not one
             // already for this id - and we do not anticipate that it could ever
             // fail and return false...
@@ -772,7 +787,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
     // Now process problem areaIds
     if (!areaRemapping.isEmpty()) {
         if (mudlet::self()->showMapAuditErrors()) {
-            QString alertMsg = tr("[ ALERT ] - Bad, (less than +1 and not the reserved -1) area ids found (count: %1)\n"
+            const QString alertMsg = tr("[ ALERT ] - Bad, (less than +1 and not the reserved -1) area ids found (count: %1)\n"
                                   "in map, now working out what new id numbers to use...")
                                        .arg(areaRemapping.count());
             mpMap->postMessage(alertMsg);
@@ -791,7 +806,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
         QMutableHashIterator<int, int> itRemappedArea(areaRemapping);
         while (itRemappedArea.hasNext()) {
             itRemappedArea.next();
-            int faultyAreaId = itRemappedArea.key();
+            const int faultyAreaId = itRemappedArea.key();
             int replacementAreaId = 0;
             do {
                 ; // No-op, increment done in test
@@ -812,7 +827,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                 pA = new TArea(mpMap, this);
             }
             if (areaNamesMap.contains(faultyAreaId)) {
-                QString areaName = areaNamesMap.value(faultyAreaId);
+                const QString areaName = areaNamesMap.value(faultyAreaId);
                 areaNamesMap.remove(faultyAreaId);
                 areaNamesMap.insert(replacementAreaId, areaName);
             } else {
@@ -840,7 +855,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
         }
     } else {
         if (mudlet::self()->showMapAuditErrors()) {
-            QString infoMsg = tr("[ INFO ]  - Area id numbering is satisfactory.");
+            const QString infoMsg = tr("[ INFO ]  - Area id numbering is satisfactory.");
             mpMap->postMessage(infoMsg);
         }
         mpMap->appendErrorMsg(tr("[ INFO ]  - Area id numbering is satisfactory."), false);
@@ -851,7 +866,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
     // Now complete TASK 1 - find the new room Ids to use
     if (!roomRemapping.isEmpty()) {
         if (mudlet::self()->showMapAuditErrors()) {
-            QString alertMsg = tr("[ ALERT ] - Bad, (less than +1) room ids found (count: %1) in map, now working\n"
+            const QString alertMsg = tr("[ ALERT ] - Bad, (less than +1) room ids found (count: %1) in map, now working\n"
                                   "out what new id numbers to use.")
                                        .arg(roomRemapping.count());
             mpMap->postMessage(alertMsg);
@@ -863,7 +878,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
 
         QString infoMsg;
         if (mudlet::self()->showMapAuditErrors()) {
-            infoMsg = tr("[ INFO ]  - The renumbered rooms will be:\n");
+            infoMsg = qsl("%1\n").arg(tr("[ INFO ]  - The renumbered rooms will be:"));
         }
         QMutableHashIterator<int, int> itRenumberedRoomId(roomRemapping);
         while (itRenumberedRoomId.hasNext()) {
@@ -911,12 +926,12 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
         QSetIterator<TRoom*> itModifiedRoom(holdingSet);
         while (itModifiedRoom.hasNext()) {
             TRoom* pR = itModifiedRoom.next();
-            int newRoomId = pR->getId();
+            const int newRoomId = pR->getId();
             rooms.insert(newRoomId, pR);
         }
     } else {
         if (mudlet::self()->showMapAuditErrors()) {
-            QString infoMsg = tr("[ INFO ]  - Room id numbering is satisfactory.");
+            const QString infoMsg = tr("[ INFO ]  - Room id numbering is satisfactory.");
             mpMap->postMessage(infoMsg);
         }
         mpMap->appendErrorMsg(tr("[ INFO ]  - Room id numbering is satisfactory."), false);
@@ -933,50 +948,34 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             // Purges any duplicates that a QList structure DOES permit, but a QSet does NOT:
             // Exit stubs:
             int _listCount = pR->exitStubs.count();
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
             // These next few construction of a QSet from a QList or vice versa
             // are probably safe as both iterators refer to the SAME instance
             // that is persistent:
             QSet<int> _set{pR->exitStubs.begin(), pR->exitStubs.end()};
-#else
-            QSet<int> _set{pR->exitStubs.toSet()};
-#endif
             if (_set.count() < _listCount) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString infoMsg = tr("[ INFO ]  - Duplicate exit stub identifiers found in room id: %1, this is an\n"
+                    const QString infoMsg = tr("[ INFO ]  - Duplicate exit stub identifiers found in room id: %1, this is an\n"
                                          "anomaly but has been cleaned up easily.")
                                               .arg(itRoom.key());
                     mpMap->postMessage(infoMsg);
                 }
                 mpMap->appendRoomErrorMsg(itRoom.key(), tr("[ INFO ]  - Duplicate exit stub identifiers found in room, this is an anomaly but has been cleaned up easily."), false);
             }
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
             pR->exitStubs = QList<int>{_set.begin(), _set.end()};
-#else
-            pR->exitStubs = _set.toList();
-#endif
 
             // Exit locks:
             _listCount = pR->exitLocks.count();
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
             _set = QSet<int>{pR->exitLocks.begin(), pR->exitLocks.end()};
-#else
-            _set = pR->exitLocks.toSet();
-#endif
             if (_set.count() < _listCount) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString infoMsg = tr("[ INFO ]  - Duplicate exit lock identifiers found in room id: %1, this is an\n"
+                    const QString infoMsg = tr("[ INFO ]  - Duplicate exit lock identifiers found in room id: %1, this is an\n"
                                          "anomaly but has been cleaned up easily.")
                                               .arg(itRoom.key());
                     mpMap->postMessage(infoMsg);
                 }
                 mpMap->appendRoomErrorMsg(itRoom.key(), tr("[ INFO ]  - Duplicate exit lock identifiers found in room, this is an anomaly but has been cleaned up easily."), false);
             }
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
             pR->exitLocks = QList<int>{_set.begin(), _set.end()};
-#else
-            pR->exitLocks = _set.toList();
-#endif
 
             // TASK 9 IS DONE INSIDE THIS METHOD:
             pR->audit(roomRemapping, areaRemapping);
@@ -995,7 +994,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                 QMutableSetIterator<int> itAreaRoom(pA->rooms);
                 if (!roomRemapping.isEmpty()) {
                     while (itAreaRoom.hasNext()) {
-                        int originalRoomId = itAreaRoom.next();
+                        const int originalRoomId = itAreaRoom.next();
                         if (roomRemapping.contains(originalRoomId)) {
                             itAreaRoom.remove();
                             replacementRoomsSet.insert(roomRemapping.value(originalRoomId));
@@ -1009,14 +1008,8 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             }
 
             // Now compare pA->rooms to areaRoomMultiHash.values(itArea.key())
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
-            // Have to create a local copy of the list of rooms to safely make
-            // a QSet of them:
             QList<int> roomIdsInAreaList{areaRoomMultiHash.values(itArea.key())};
-            QSet<int> foundRooms{roomIdsInAreaList.begin(), roomIdsInAreaList.end()};
-#else
-            QSet<int> foundRooms{areaRoomMultiHash.values(itArea.key()).toSet()};
-#endif
+            QSet<int> const foundRooms{roomIdsInAreaList.begin(), roomIdsInAreaList.end()};
 
             QSetIterator<int> itFoundRoom(foundRooms);
             // Original form of code which was slower because the two sets of rooms were
@@ -1043,18 +1036,14 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             // Report differences:
             if (!missingRooms.isEmpty()) {
                 QStringList roomList;
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
                 QList<int> missingRoomsList{missingRooms.begin(), missingRooms.end()};
-#else
-                QList<int> missingRoomsList{missingRooms.toList()};
-#endif
                 if (missingRoomsList.size() > 1) {
                     // The on-screen listing are clearer if we sort the rooms
                     std::sort(missingRoomsList.begin(), missingRoomsList.end());
                 }
                 QListIterator<int> itMissingRoom(missingRoomsList);
                 while (itMissingRoom.hasNext()) {
-                    int missingRoomId = itMissingRoom.next();
+                    const int missingRoomId = itMissingRoom.next();
                     roomList.append(QString::number(missingRoomId));
                     mpMap->appendRoomErrorMsg(missingRoomId,
                                               tr("[ INFO ]  - This room claims to be in area id: %1, but that did not have a record of it."
@@ -1063,7 +1052,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                                               true);
                 }
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString infoMsg = tr("[ INFO ]  - In area with id: %1 there were %2 rooms missing from those it\n"
+                    const QString infoMsg = tr("[ INFO ]  - In area with id: %1 there were %2 rooms missing from those it\n"
                                          "should be recording as possessing, they were:\n%3\nthey have been added.")
                                               .arg(itArea.key())
                                               .arg(missingRooms.count())
@@ -1083,17 +1072,13 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
 
             if (!extraRooms.isEmpty()) {
                 QStringList roomList;
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
                 QList<int> extraRoomsList{extraRooms.begin(), extraRooms.end()};
-#else
-                QList<int> extraRoomsList{extraRooms.toList()};
-#endif
                 if (extraRoomsList.size() > 1) {
                     std::sort(extraRoomsList.begin(), extraRoomsList.end());
                 }
                 QListIterator<int> itExtraRoom(extraRoomsList);
                 while (itExtraRoom.hasNext()) {
-                    int extraRoomId = itExtraRoom.next();
+                    const int extraRoomId = itExtraRoom.next();
                     roomList.append(QString::number(extraRoomId));
                     mpMap->appendRoomErrorMsg(extraRoomId,
                                               tr("[ INFO ]  - This room was claimed by area id: %1, but it does not belong there."
@@ -1102,7 +1087,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                                               true);
                 }
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString infoMsg = tr("[ INFO ]  - In area with id: %1 there were %2 extra rooms compared to those it\n"
+                    const QString infoMsg = tr("[ INFO ]  - In area with id: %1 there were %2 extra rooms compared to those it\n"
                                          "should be recording as possessing, they were:\n%3\nthey have been removed.")
                                               .arg(itArea.key())
                                               .arg(extraRooms.count())
@@ -1128,23 +1113,35 @@ void TRoomDB::clearMapDB()
 {
     QElapsedTimer timer;
     timer.start();
-    QList<TRoom*> rPtrL = getRoomPtrList();
+
+    // Set bulk deletion mode to prevent expensive individual cleanup
+    mBulkDeletionMode = true;
+
+    QList<TRoom*> const rPtrL = getRoomPtrList();
+    QList<TArea*> const areaList = getAreaPtrList();
+
+    // Clear all containers first - this prevents individual destructors
+    // from trying to remove themselves from the containers (O(n²) behavior)
     rooms.clear(); // Prevents any further use of TRoomDB::getRoom(int) !!!
+    areas.clear();
     entranceMap.clear();
     areaNamesMap.clear();
     hashToRoomID.clear();
     roomIDToHash.clear();
-    for (auto room : rPtrL) {
-        delete room; // Uses the internally held value of the room Id
-                     // (TRoom::id) to call TRoomDB::__removeRoom(id)
-    }
-    //    assert(!rooms.size()); // Pointless as rooms.clear() will have achieved the test condition
 
-    QList<TArea*> areaList = getAreaPtrList();
+    // Now delete all objects - their destructors will see mBulkDeletionMode=true
+    // and skip the expensive cleanup operations
+    for (auto room : rPtrL) {
+        delete room;
+    }
+
     for (auto area : areaList) {
         delete area;
     }
     assert(areas.empty());
+
+    mBulkDeletionMode = false;
+
     // Must now reinsert areaId -1 name = "Default Area"
     addArea(-1, mpMap->getDefaultAreaName());
     qDebug() << "TRoomDB::clearMapDB() run time:" << timer.nsecsElapsed() * 1.0e-9 << "sec.";
@@ -1213,14 +1210,14 @@ void TRoomDB::restoreAreaMap(QDataStream& ifs)
                     R"(It has been detected that "_###" form suffixes have already been used, for simplicity in the renaming algorithm these will have been removed and possibly changed as Mudlet sorts this matter out, if a number assigned in this way <b>is</b> important to you, you can change it back, provided you rename the area that has been allocated the suffix that was wanted first...!</p>)");
         }
         if (!renamedMap.empty()) {
-            detailText = tr("[  OK  ]  - The changes made are:\n"
-                            "(ID) \"old name\" ==> \"new name\"\n");
-            QMapIterator<QString, QString> itRemappedNames = renamedMap;
+            detailText = qsl("%1\n").arg(tr("[  OK  ]  - The changes made are:\n"
+                                            "(ID) \"old name\" ==> \"new name\""));
+            QMultiMapIterator<QString, QString> itRemappedNames = renamedMap;
             itRemappedNames.toBack();
             // Seems to look better if we iterate through backwards!
             while (itRemappedNames.hasPrevious()) {
                 itRemappedNames.previous();
-                QString oldName = itRemappedNames.key().isEmpty() ? tr("<nothing>") : itRemappedNames.key();
+                const QString oldName = itRemappedNames.key().isEmpty() ? tr("<nothing>") : itRemappedNames.key();
                 detailText.append(qsl("(%1) \"%2\" ==> \"%3\"\n").arg(areaNamesMap.key(itRemappedNames.value())).arg(oldName, itRemappedNames.value()));
                 mpMap->appendAreaErrorMsg(areaNamesMap.key(itRemappedNames.value()),
                                           tr(R"([ INFO ]  - Area name changed to prevent duplicates or unnamed ones; old name: "%1", new name: "%2".)").arg(oldName, itRemappedNames.value()),
@@ -1284,7 +1281,7 @@ void TRoomDB::restoreAreaMap(QDataStream& ifs)
 
     if (!areaNamesMap.contains(-1)) {
         areaNamesMap.insert(-1, mpMap->getDefaultAreaName());
-        QString defaultAreaNameInsertionMsg = tr("[ INFO ]  - Default (reset) area name (for rooms that have not been assigned to an\n"
+        const QString defaultAreaNameInsertionMsg = tr("[ INFO ]  - Default (reset) area name (for rooms that have not been assigned to an\n"
                                                  "area) not found, adding \"%1\" against the reserved -1 id.")
                                                       .arg(mpMap->getDefaultAreaName());
         mpMap->mpHost->postMessage(defaultAreaNameInsertionMsg);
@@ -1342,3 +1339,24 @@ bool getUserDataBool(const QMap<QString, QString>& userData, const QString& key,
     }
 }
 
+bool TRoomDB::set2DMapZoom(const int areaId, const qreal zoom) const
+{
+    auto pA = areas.value(areaId);
+    if (!pA) {
+        return false;
+    }
+    if (zoom < T2DMap::csmMinXYZoom) {
+        return false;
+    }
+    pA->set2DMapZoom(zoom);
+    return true;
+}
+
+qreal TRoomDB::get2DMapZoom(const int areaId) const
+{
+    auto pA = areas.value(areaId);
+    if (!pA) {
+        return T2DMap::csmDefaultXYZoom;
+    }
+    return pA->get2DMapZoom();
+}

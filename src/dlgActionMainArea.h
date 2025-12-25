@@ -23,9 +23,7 @@
  ***************************************************************************/
 
 
-#include "pre_guard.h"
 #include "ui_actions_main_area.h"
-#include "post_guard.h"
 
 
 class dlgActionMainArea : public QWidget, public Ui::actions_main_area
@@ -35,6 +33,13 @@ class dlgActionMainArea : public QWidget, public Ui::actions_main_area
 public:
     Q_DISABLE_COPY(dlgActionMainArea)
     explicit dlgActionMainArea(QWidget*);
+
+    // public function allow to trim even when QLineEdit::editingFinished()
+    // is not raised. Example: When the user saves without leaving the LineEdit
+    void trimName();
+
+private slots:
+    void slot_editingNameFinished();
 };
 
 #endif // MUDLET_DLGACTIONMAINAREA_H

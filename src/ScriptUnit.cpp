@@ -1,7 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2022 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2022-2024 by Stephen Lyons - slysven@virginmedia.com    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -115,6 +115,16 @@ void ScriptUnit::reParentScript(int childID, int oldParentID, int newParentID, i
     }
 }
 
+void ScriptUnit::reParentScript(int childID, int oldParentID, int newParentID, TreeItemInsertMode mode, int position)
+{
+    if (mode == TreeItemInsertMode::Append) {
+        reParentScript(childID, oldParentID, newParentID, -1, -1);
+    } else {
+        // AtPosition mode - use 0 for parentPosition to enable position-based insertion
+        reParentScript(childID, oldParentID, newParentID, 0, position);
+    }
+}
+
 void ScriptUnit::removeScriptRootNode(TScript* pT)
 {
     if (!pT) {
@@ -127,18 +137,16 @@ TScript* ScriptUnit::getScript(int id)
 {
     if (mScriptMap.find(id) != mScriptMap.end()) {
         return mScriptMap.value(id);
-    } else {
-        return nullptr;
     }
+    return nullptr;
 }
 
 TScript* ScriptUnit::getScriptPrivate(int id)
 {
     if (mScriptMap.find(id) != mScriptMap.end()) {
         return mScriptMap.value(id);
-    } else {
-        return nullptr;
     }
+    return nullptr;
 }
 
 bool ScriptUnit::registerScript(TScript* pT)
@@ -204,24 +212,36 @@ int ScriptUnit::getNewID()
     return ++mMaxID;
 }
 
-void ScriptUnit::compileAll()
+void ScriptUnit::compileAll(bool saveLoadingError)
 {
     for (auto script : mScriptRootNodeList) {
         if (script->isActive()) {
-            script->compileAll();
+            script->compileAll(saveLoadingError);
         }
+    }
+    if (mpHost->mpEditorDialog) {
+        mpHost->mpEditorDialog->doCleanReset();
     }
 }
 
-QVector<int> ScriptUnit::findScriptId(const QString& name) const
+std::vector<int> ScriptUnit::findItems(const QString& name, const bool exactMatch, const bool caseSensitive)
 {
-    QVector<int> Ids;
-    for (auto script : mScriptMap) {
-        if (script->getName() == name) {
-            Ids.append(script->getID());
+    std::vector<int> ids;
+    const auto searchCaseSensitivity = caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
+    if (exactMatch) {
+        for (auto& item : std::as_const(mScriptMap)) {
+            if (!item->getName().compare(name, searchCaseSensitivity)) {
+                ids.push_back(item->getID());
+            }
+        }
+    } else {
+        for (auto& item : std::as_const(mScriptMap)) {
+            if (item->getName().contains(name, searchCaseSensitivity)) {
+                ids.push_back(item->getID());
+            }
         }
     }
-    return Ids;
+    return ids;
 }
 
 void ScriptUnit::assembleReport(TScript* pItem)

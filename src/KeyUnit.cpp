@@ -1,7 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2018, 2020, 2022 by Stephen Lyons                       *
+ *   Copyright (C) 2018, 2020, 2022-2024 by Stephen Lyons                  *
  *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -27,6 +27,8 @@
 #include "Host.h"
 #include "TKey.h"
 
+#include <functional>
+
 KeyUnit::KeyUnit(Host* pHost)
 : mRunAllKeyMatches(false)
 , mpHost(pHost)
@@ -34,6 +36,27 @@ KeyUnit::KeyUnit(Host* pHost)
 , mModuleMember(false)
 {
     setupKeyNames();
+}
+
+KeyUnit::~KeyUnit()
+{
+    // Set mpHost to null on all keys (including children) to prevent them from trying to
+    // unregister themselves during destruction (which would modify the list
+    // we're iterating over and cause iterator invalidation)
+    for (auto key : mKeyRootNodeList) {
+        key->mpHost = nullptr;
+        // Also set mpHost to null on all children recursively
+        std::function<void(TKey*)> nullifyChildren = [&nullifyChildren](TKey* k) {
+            for (auto child : *k->mpMyChildrenList) {
+                child->mpHost = nullptr;
+                nullifyChildren(child);
+            }
+        };
+        nullifyChildren(key);
+    }
+    for (auto key : mKeyRootNodeList) {
+        delete key;
+    }
 }
 
 void KeyUnit::resetStats()
@@ -70,15 +93,31 @@ void KeyUnit::uninstall(const QString& packageName)
 bool KeyUnit::processDataStream(const Qt::Key key, const Qt::KeyboardModifiers modifiers)
 {
     bool isMatchFound = false;
+
+    // Set processing flag to prevent re-entrant cleanup during key execution
+    mIsProcessing = true;
+
     for (auto keyObject : mKeyRootNodeList) {
+        // Skip null or invalid key objects during profile closing/destruction
+        // Skip null or invalid key objects during profile closing/destruction
+        if (!keyObject || !keyObject->isActive() || (keyObject->mpHost && keyObject->mpHost->isClosingDown())) {
+            continue;
+        }
+
         if (keyObject->match(key, modifiers, mRunAllKeyMatches)) {
             if (!mRunAllKeyMatches) {
+                // Clear processing flag and perform any deferred cleanup before returning
+                mIsProcessing = false;
+                doCleanup();
                 return true;
             }
-
             isMatchFound = true;
         }
     }
+
+    // Clear processing flag and perform any deferred cleanup
+    mIsProcessing = false;
+    doCleanup();
 
     return isMatchFound;
 }
@@ -108,17 +147,37 @@ void KeyUnit::reenableAllTriggers()
 
 TKey* KeyUnit::findFirstKey(QString& name)
 {
-    QMap<QString, TKey*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     if (it != mLookupTable.cend() && it.key() == name) {
         return it.value();
     }
     return nullptr;
 }
 
+std::vector<int> KeyUnit::findItems(const QString& name, const bool exactMatch, const bool caseSensitive)
+{
+    std::vector<int> ids;
+    const auto searchCaseSensitivity = caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
+    if (exactMatch) {
+        for (auto& item : std::as_const(mKeyMap)) {
+            if (!item->getName().compare(name, searchCaseSensitivity)) {
+                ids.push_back(item->getID());
+            }
+        }
+    } else {
+        for (auto& item : std::as_const(mKeyMap)) {
+            if (item->getName().contains(name, searchCaseSensitivity)) {
+                ids.push_back(item->getID());
+            }
+        }
+    }
+    return ids;
+}
+
 bool KeyUnit::enableKey(const QString& name)
 {
     bool found = false;
-    QMap<QString, TKey*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     while (it != mLookupTable.cend() && it.key() == name) {
         TKey* pT = it.value();
         // Unlike the TTriggerUnit version of this code we directly set
@@ -135,7 +194,7 @@ bool KeyUnit::enableKey(const QString& name)
 bool KeyUnit::disableKey(const QString& name)
 {
     bool found = false;
-    QMap<QString, TKey*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     while (it != mLookupTable.cend() && it.key() == name) {
         TKey* pT = it.value();
         // Unlike the TTriggerUnit version of this code we directly clear
@@ -223,6 +282,16 @@ void KeyUnit::reParentKey(int childID, int oldParentID, int newParentID, int par
     } else {
         pChild->Tree<TKey>::setParent(nullptr);
         addKeyRootNode(pChild, parentPosition, childPosition, true);
+    }
+}
+
+void KeyUnit::reParentKey(int childID, int oldParentID, int newParentID, TreeItemInsertMode mode, int position)
+{
+    if (mode == TreeItemInsertMode::Append) {
+        reParentKey(childID, oldParentID, newParentID, -1, -1);
+    } else {
+        // AtPosition mode - use 0 for parentPosition to enable position-based insertion
+        reParentKey(childID, oldParentID, newParentID, 0, position);
     }
 }
 
@@ -380,20 +449,23 @@ std::tuple<QString, int, int, int> KeyUnit::assembleReport()
 
 void KeyUnit::markCleanup(TKey* pT)
 {
-    for (auto key : mCleanupList) {
-        if (key == pT) {
-            return;
-        }
-    }
-    mCleanupList.push_back(pT);
+    mCleanupSet.insert(pT);
 }
 
 void KeyUnit::doCleanup()
 {
-    for (auto key : mCleanupList) {
-        delete key;
+    // Skip cleanup if we're currently processing keys to prevent iterator invalidation
+    // Cleanup will be performed when processDataStream() completes
+    if (mIsProcessing) {
+        return;
     }
-    mCleanupList.clear();
+
+    QMutableSetIterator<TKey*> itKey(mCleanupSet);
+    while (itKey.hasNext()) {
+        auto pKey = itKey.next();
+        itKey.remove();
+        delete pKey;
+    }
 }
 
 void KeyUnit::setupKeyNames()

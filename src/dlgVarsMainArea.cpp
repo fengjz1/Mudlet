@@ -22,15 +22,18 @@
 
 #include "dlgVarsMainArea.h"
 
-#include "pre_guard.h"
 #include <QListWidgetItem>
-#include "post_guard.h"
 
 extern "C" {
+#if defined(INCLUDE_VERSIONED_LUA_HEADERS)
+#include <lua5.1/lua.h>
+#else
 #include <lua.h>
+#endif
 }
 
-dlgVarsMainArea::dlgVarsMainArea(QWidget* pF) : QWidget(pF)
+dlgVarsMainArea::dlgVarsMainArea(QWidget* pParentWidget)
+: QWidget(pParentWidget)
 {
     // init generated dialog
     setupUi(this);

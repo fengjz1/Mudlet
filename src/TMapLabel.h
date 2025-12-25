@@ -4,7 +4,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2014-2016, 2018-2021 by Stephen Lyons                   *
+ *   Copyright (C) 2014-2016, 2018-2022 by Stephen Lyons                   *
  *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -24,31 +24,30 @@
  ***************************************************************************/
 
 
-#include "pre_guard.h"
 #include <QtGlobal>
 #include <QColor>
 #include <QPixmap>
 #include <QSizeF>
 #include <QVector3D>
-#include "post_guard.h"
 
 
 class TMapLabel
 {
 public:
+    QByteArray base64EncodePixmap() const;
 
     QVector3D pos;
     QSizeF size;
     QSizeF clickSize;
     QString text;
-    QColor fgColor {Qt::black};
-    QColor bgColor {Qt::black};
+    QColor fgColor = QColorConstants::Black;
+    QColor bgColor = QColorConstants::Black;
+    QColor outlineColor = QColorConstants::Black;
     QPixmap pix;
-    bool highlight {};
-    bool showOnTop {};
-    bool noScaling {};
-
-    QByteArray base64EncodePixmap() const;
+    bool highlight = false;
+    bool showOnTop = false;
+    bool noScaling = false;
+    bool temporary = false;
 };
 
 #endif // MUDLET_TMAPLABEL_H

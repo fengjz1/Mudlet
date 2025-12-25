@@ -23,15 +23,14 @@
 #include "FontManager.h"
 #include "mudlet.h"
 
-#include "pre_guard.h"
 #include <QDir>
 #include <QFileInfo>
 #include <QDesktopServices>
-#include "post_guard.h"
+#include <QFontDatabase>
 
 void FontManager::addFonts()
 {
-    QDir dir(mudlet::getMudletPath(mudlet::mainFontsPath));
+    const QDir dir(mudlet::getMudletPath(enums::mainFontsPath));
 
     if (!dir.exists()) {
         return;
@@ -56,7 +55,7 @@ void FontManager::loadFonts(const QString& folder)
     dir.setNameFilters(filters);
 
     for (auto fontFile : dir.entryList(QDir::Files | QDir::Readable | QDir::NoDotAndDotDot)) {
-        QString fontFilePathName = qsl("%1/%2").arg(dir.absolutePath(), fontFile);
+        const QString fontFilePathName = qsl("%1/%2").arg(dir.absolutePath(), fontFile);
         loadFont(fontFilePathName);
     }
 }
@@ -82,7 +81,7 @@ void FontManager::loadFont(const QString& filePath, const QString& belongsTo)
 
 bool FontManager::fontAlreadyLoaded(const QString& filePath)
 {
-    QFileInfo fontFile(filePath);
+    const QFileInfo fontFile(filePath);
     auto fileName = fontFile.fileName();
 
     return loadedFontPaths.contains(fileName);
@@ -90,7 +89,7 @@ bool FontManager::fontAlreadyLoaded(const QString& filePath)
 
 void FontManager::rememberFont(const QString& filePath, int fontID, const QString& belongsTo)
 {
-    QFileInfo fontFile(filePath);
+    const QFileInfo fontFile(filePath);
     auto fileName = fontFile.fileName();
 
     if (loadedFontPaths.contains(fileName)) {
@@ -108,4 +107,17 @@ void FontManager::unloadFonts(const QString& belongsTo)
         QFontDatabase::removeApplicationFont(id);
     }
     loadedFontAffiliation.remove(belongsTo);
+}
+
+void FontManager::addEmojiFont()
+{
+#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    // Use the new Qt 6.9 function for emoji fonts
+    QFontDatabase::addApplicationEmojiFontFamily(qsl("Noto Color Emoji"));
+#else
+    // Fallback for older Qt versions - this will be handled by individual components
+    // using QFont::insertSubstitution as before
+#endif
+#endif // defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
 }

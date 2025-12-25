@@ -25,23 +25,27 @@
 #include "TLinkStore.h"
 #include "TMxpClient.h"
 #include "TMxpEvent.h"
+#include "TMxpProcessor.h"
 
-#include "pre_guard.h"
 #include <QList>
 #include <QQueue>
-#include "post_guard.h"
+#include <QStack>
 
 class Host;
 class TMediaData;
 
 class TMxpMudlet : public TMxpClient
 {
+    // Count how many of this format have been stacked/applied on top of each other
+    unsigned int boldCounter = 0;
+    unsigned int italicCounter = 0;
+    unsigned int underlineCounter = 0;
+    unsigned int strikeOutCounter = 0;
+    QString mxpStyle; // Name/Version of the MXP style sheet uploaded by the mud
+
 public:
     explicit TMxpMudlet(Host* pHost)
-    : isBold(false)
-    , isItalic(false)
-    , isUnderline(false)
-    , mpHost(pHost)
+    : mpHost(pHost)
     , mLinkMode(false)
     {}
 
@@ -79,12 +83,27 @@ public:
 
     bool getLink(int id, QStringList** links, QStringList** hints) override;
 
+    // EXPIRE tag support
+    int setLink(const QStringList& links, const QStringList& hints, const QString& expireName) override;
+    void expireLinks(const QString& expireName) override;
+
     void playMedia(TMediaData& mediaData) override;
     void stopMedia(TMediaData& mediaData) override;
 
-    void setBold(bool bold) override { isBold = bold; }
-    void setItalic(bool italic) override { isItalic = italic; }
-    void setUnderline(bool underline) override { isUnderline = underline; }
+    void setBold(bool bold) override;
+    void setItalic(bool italic) override;
+    void setUnderline(bool underline) override;
+    void setStrikeOut(bool strikeOut) override;
+
+    bool bold() override { return boldCounter > 0; }
+    bool italic() override { return italicCounter > 0; }
+    bool underline() override { return underlineCounter > 0; }
+    bool strikeOut() override { return strikeOutCounter > 0; }
+
+    void resetTextProperties() override;
+
+    void setStyle(const QString& val) override { mxpStyle = val; }
+    QString getStyle() override { return mxpStyle;}
 
     void setFlag(const QString& elementName, const QMap<QString, QString>& values, const QString& content) override {
         Q_UNUSED(elementName)
@@ -103,6 +122,8 @@ public:
         Q_UNUSED(value)
     }
 
+    bool startTagReceived(MxpStartTag* startTag) override;
+    
     TMxpTagHandlerResult tagHandled(MxpTag* tag, TMxpTagHandlerResult result) override;
 
     void enqueueMxpEvent(MxpStartTag* tag);
@@ -114,13 +135,21 @@ public:
     // Shouldn't be here, look for a better solution
     QQueue<TMxpEvent> mMxpEvents;
 
-    bool isBold;
-    bool isItalic;
-    bool isUnderline;
+    void setCaptionForSendEvent(const QString& caption) override;
+
+    int getWrapWidth() const override;
+
+    void insertText(const QString& text) override;
+
+    QStack<TMxpEvent> mPendingSendEvents;
+    
+    // Get the encoding used by the connection
+    QByteArray getEncoding() const override;
+    bool shouldLockModeToSecure() const override;
 
 private:
-    inline static const QString scmVersion = qsl(APP_VERSION APP_BUILD);
-
+    bool isTagAllowedInMode(const QString& tagName, TMXPMode mode) const;
+    
     Host* mpHost;
     bool mLinkMode;
 };

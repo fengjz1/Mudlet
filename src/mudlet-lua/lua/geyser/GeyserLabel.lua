@@ -1,14 +1,9 @@
--- Label class to use CSS and images
-
---------------------------------------
---                                  --
--- The Geyser Layout Manager by guy --
---                                  --
---------------------------------------
+--- Label class to use CSS and images.
+-- <br/>See also: <a href="https://wiki.mudlet.org/w/Manual:Geyser#Geyser.Label">Mudlet Manual</a>
+-- @author guy
+-- @module Geyser.Label
 
 --- Represents a label like we all know and love.
--- @class table
--- @name Geyser.Label
 -- @field fillBg 1 if the background is to be filled, 0 for no background.
 Geyser.Label = Geyser.Window:new({
   name = "LabelClass",
@@ -73,12 +68,158 @@ function Geyser.Label:rawEcho(message)
   self:autoAdjustSize()
 end
 
+--- Prints a message to the label with decho color formatting, preserving label's font size and formatting.
+-- @param message The message to print. Uses decho color codes like "<255,0,0>text" for colors.
+function Geyser.Label:decho(message)
+  message = message or self.message
+  self.message = message
+
+  -- Build resetFormat table using label's actual fgColor, not just stylesheet
+  local resetFormat = getLabelFormat(self.name)
+  -- Override foreground with label's fgColor property if set
+  if self.fgColor and self.fgColor ~= "" then
+    resetFormat.foreground = Geyser.Color.hex(self.fgColor)
+  end
+
+  -- Convert decho formatted text to HTML, preserving label's colors
+  local htmlContent = decho2html(message, resetFormat)
+
+  -- Apply label's formatting settings
+  local ft = self.formatTable
+  local fs = ft.fontSize
+  local alignment = ft.alignment
+  if alignment ~= "" then
+    alignment = string.format([[align="%s" ]], alignment)
+  end
+  if ft.bold then
+    htmlContent = "<b>" .. htmlContent .. "</b>"
+  end
+  if ft.italics then
+    htmlContent = "<i>" .. htmlContent .. "</i>"
+  end
+  if ft.underline then
+    htmlContent = "<u>" .. htmlContent .. "</u>"
+  end
+  if ft.strikethrough then
+    htmlContent = "<s>" .. htmlContent .. "</s>"
+  end
+  if self.font and self.font ~= "" then
+    htmlContent = string.format('<font face="%s">%s</font>', self.font, htmlContent)
+  end
+  if not fs then
+    fs = tostring(self.fontSize)
+  end
+  fs = "font-size: " .. fs .. "pt; "
+  htmlContent = [[<div ]] .. alignment .. [[style="]] .. fs ..
+  [[">]] .. htmlContent .. [[</div>]]
+  echo(self.name, htmlContent)
+  self:autoAdjustSize()
+end
+
+--- Prints a message to the label with hecho color formatting, preserving label's font size and formatting.
+-- @param message The message to print. Uses hecho color codes like "|cff0000text" for colors.
+function Geyser.Label:hecho(message)
+  message = message or self.message
+  self.message = message
+
+  -- Build resetFormat table using label's actual fgColor, not just stylesheet
+  local resetFormat = getLabelFormat(self.name)
+  -- Override foreground with label's fgColor property if set
+  if self.fgColor and self.fgColor ~= "" then
+    resetFormat.foreground = Geyser.Color.hex(self.fgColor)
+  end
+
+  -- Convert hecho formatted text to HTML, preserving label's colors
+  local htmlContent = hecho2html(message, resetFormat)
+
+  -- Apply label's formatting settings
+  local ft = self.formatTable
+  local fs = ft.fontSize
+  local alignment = ft.alignment
+  if alignment ~= "" then
+    alignment = string.format([[align="%s" ]], alignment)
+  end
+  if ft.bold then
+    htmlContent = "<b>" .. htmlContent .. "</b>"
+  end
+  if ft.italics then
+    htmlContent = "<i>" .. htmlContent .. "</i>"
+  end
+  if ft.underline then
+    htmlContent = "<u>" .. htmlContent .. "</u>"
+  end
+  if ft.strikethrough then
+    htmlContent = "<s>" .. htmlContent .. "</s>"
+  end
+  if self.font and self.font ~= "" then
+    htmlContent = string.format('<font face="%s">%s</font>', self.font, htmlContent)
+  end
+  if not fs then
+    fs = tostring(self.fontSize)
+  end
+  fs = "font-size: " .. fs .. "pt; "
+  htmlContent = [[<div ]] .. alignment .. [[style="]] .. fs ..
+  [[">]] .. htmlContent .. [[</div>]]
+  echo(self.name, htmlContent)
+  self:autoAdjustSize()
+end
+
+--- Prints a message to the label with cecho color formatting, preserving label's font size and formatting.
+-- @param message The message to print. Uses cecho color codes like "<red>text" for colors.
+function Geyser.Label:cecho(message)
+  message = message or self.message
+  self.message = message
+
+  -- Build resetFormat table using label's actual fgColor, not just stylesheet
+  local resetFormat = getLabelFormat(self.name)
+  -- Override foreground with label's fgColor property if set
+  if self.fgColor and self.fgColor ~= "" then
+    resetFormat.foreground = Geyser.Color.hex(self.fgColor)
+  end
+
+  -- Convert cecho formatted text to HTML, preserving label's colors
+  local htmlContent = cecho2html(message, resetFormat)
+
+  -- Apply label's formatting settings
+  local ft = self.formatTable
+  local fs = ft.fontSize
+  local alignment = ft.alignment
+  if alignment ~= "" then
+    alignment = string.format([[align="%s" ]], alignment)
+  end
+  if ft.bold then
+    htmlContent = "<b>" .. htmlContent .. "</b>"
+  end
+  if ft.italics then
+    htmlContent = "<i>" .. htmlContent .. "</i>"
+  end
+  if ft.underline then
+    htmlContent = "<u>" .. htmlContent .. "</u>"
+  end
+  if ft.strikethrough then
+    htmlContent = "<s>" .. htmlContent .. "</s>"
+  end
+  if self.font and self.font ~= "" then
+    htmlContent = string.format('<font face="%s">%s</font>', self.font, htmlContent)
+  end
+  if not fs then
+    fs = tostring(self.fontSize)
+  end
+  fs = "font-size: " .. fs .. "pt; "
+  htmlContent = [[<div ]] .. alignment .. [[style="]] .. fs ..
+  [[">]] .. htmlContent .. [[</div>]]
+  echo(self.name, htmlContent)
+  self:autoAdjustSize()
+end
+
 --- sets the color of the text on the label
 -- @param color the color you want the text to be. Can use color names such as "red", decho codes such as "<255,0,0>" and hex codes such as "#ff0000"
 function Geyser.Label:setFgColor(color)
   self:echo(nil, color, nil)
 end
 
+--- sets the formatting options for text on the label using a formatting string
+-- @param format A format list to use. 'c' - center, 'l' - left, 'r' - right,  'b' - bold, 'i' - italics, 'u' - underline, 's' - strikethrough,  '##' - font size.  For example, "cb18" specifies center bold 18pt font be used.  Order doesn't matter.
 function Geyser.Label:setFormat(format)
   self:echo(nil, nil, format)
 end
@@ -122,6 +263,11 @@ function Geyser.Label:setFont(font)
     debugc(err)
   end
   self.font = font
+  -- Apply the profile's antialiasing settings to the label for static font compatibility
+  -- Use existing setFont() function with label name - this handles static fonts and antialiasing
+  if font ~= "" then
+    setFont(self.name, font)
+  end
   self:echo()
 end
 
@@ -169,8 +315,8 @@ function Geyser.Label:autoAdjustSize()
 end
 
 ---Enable autoAdjustSize
--- @param set width to false if just autoAdjust height
--- @param set height to false if just autoAdjust width
+-- @param width set width to false if just autoAdjust height
+-- @param height set height to false if just autoAdjust width
 function Geyser.Label:enableAutoAdjustSize(width, height)
   self.autoHeight = true
   self.autoWidth = true
@@ -192,9 +338,9 @@ function Geyser.Label:disableAutoAdjustSize()
 end
 
 ---setMovie allows to set a gif animation on a label
--- @param filename the path to the gif file
+-- @param fileName the path to the gif file
 function Geyser.Label:setMovie(fileName)
-  result, error = setMovie(self.name, fileName)
+  local result, error = setMovie(self.name, fileName)
   self:autoAdjustSize()
   return result, error
 end
@@ -293,6 +439,11 @@ function Geyser.Label:setFontSize(fontSize)
   self.formatTable.fontSize = fontSize
   self.format = self.format:gsub("%d", "")
   self.format = self.format .. fontSize
+  -- Apply the profile's antialiasing settings to the label when font size changes
+  -- Use existing setFont() function - it will preserve the font family and apply antialiasing
+  if self.font and self.font ~= "" then
+    setFont(self.name, self.font)
+  end
   self:echo()
 end
 
@@ -427,6 +578,28 @@ function Geyser.Label:setStyleSheet(css)
   self.stylesheet = css
   self:autoAdjustSize()
 end
+
+--- Sets the hyperlink styling for the label
+-- @param linkColor Color for normal links (e.g., "cyan", "#00ffff")
+-- @param visitedColor Color for visited links (e.g., "purple", "#ff00ff")
+-- @param underline Whether links should be underlined (default: true)
+function Geyser.Label:setLinkStyle(linkColor, visitedColor, underline)
+  if underline == nil then
+    underline = true
+  end
+  setLinkStyle(self.name, linkColor, visitedColor, underline)
+end
+
+--- Resets the hyperlink styling to Qt defaults
+function Geyser.Label:resetLinkStyle()
+  resetLinkStyle(self.name)
+end
+
+--- Clears the visited links history for this label
+function Geyser.Label:clearVisitedLinks()
+  clearVisitedLinks(self.name)
+end
+
 --- Sets the tooltip of the label
 -- @param txt the tooltip txt
 -- @param duration the duration of the tooltip
@@ -446,7 +619,7 @@ end
 
 --- Set a predefined mouse cursor shape for this label
 -- @param cursorShape the predefined cursorshape as a string
--- see: https://wiki.mudlet.org/w/CursorShapes
+-- See: <a href="https://wiki.mudlet.org/w/CursorShapes">https://wiki.mudlet.org/w/CursorShapes</a>
 function Geyser.Label:setCursor(cursorShape)
   setLabelCursor(self.name, cursorShape)
   -- Get cursorShape as string
@@ -459,9 +632,11 @@ function Geyser.Label:setCursor(cursorShape)
   self.cursorShape = cursorShape
 end
 
---- Set a custom mouse cursor shape for this label
+--- Set a custom mouse cursor shape for this label.
+-- See: <a href=https://doc.qt.io/qt-5/qcursor.html#shape>https://doc.qt.io/qt-5/qcursor.html#shape</a>
 -- @param customCursor location of your custom cursor. It's suggested to use a png with size of 32x32 which is supported on all platforms
--- see https://doc.qt.io/qt-5/qcursor.html#shape
+-- @param hotX the X position of the cursor hotspot
+-- @param hotY the Y position of the cursor hotspot
 function Geyser.Label:setCustomCursor(customCursor, hotX, hotY)
   hotX = hotX or -1
   hotY = hotY or -1
@@ -497,7 +672,7 @@ function closeAllLevels(label)
 end
 
 --- Closes all nested labels under the given label, including any
---- nested children those children might possess
+-- nested children those children might possess
 -- @param label The name of the label to use
 function closeNestChildren(label)
   local nLabels = label.nestedLabels
@@ -520,7 +695,7 @@ function closeNestChildren(label)
 end
 
 --- Internal function.  This is a callback from a nested
---- labels scrollbar.
+-- labels scrollbar.
 -- @param label The name of the scrollbar
 function doNestScroll(label)
   local scrollDir = 0
@@ -552,7 +727,7 @@ function doNestScroll(label)
 end
 
 --- Displays the nested elements within label, and orients them
---- appropriately
+-- appropriately
 -- @param label The name of the label to use
 function Geyser.Label:displayNest()
   local maxDim = {}
@@ -788,7 +963,7 @@ function doNestLeave(label)
   if Geyser.Label.closeAllTimer then
     killTimer(Geyser.Label.closeAllTimer)
   end
-  Geyser.Label.closeAllTimer = tempTimer(2, function() closeAllLevels(label) end)
+  Geyser.Label.closeAllTimer = tempTimer(.5, function() closeAllLevels(label) end)
 end
 
 -- Save a reference to our parent constructor
@@ -923,6 +1098,18 @@ function Geyser.Label:new (cons, container)
   return me
 end
 
+--- Deletes the label using the C++ deleteLabel function
+-- Note: Nested labels (in nestedLabels array) have their own containers
+-- and will be deleted through their container's cascading delete mechanism.
+-- The nestedLabels array is for organizational purposes only.
+function Geyser.Label:type_delete()
+  -- Clean up nested label references to avoid dangling references
+  if self.nestedLabels then
+    self.nestedLabels = {}
+  end
+  deleteLabel(self.name)
+end
+
 --- Overridden constructor to use add2
 function Geyser.Label:new2 (cons, container)
   cons = cons or {}
@@ -963,7 +1150,8 @@ function Geyser.Label:addScrollbars(parent, layout)
   return { backward, forward }
 end
 
----@param cons table of Geyser window options such as name, width, and height
+--- Add a child to this label.
+-- @param cons table of Geyser window options such as name, width, and height
 -- @param cons.name a unique name for the label
 -- @param cons.height height of the label - specify it as the defaults are huge
 -- @param cons.width width of the label - specify it as the defaults are huge
@@ -971,8 +1159,9 @@ end
 -- @param[opt=false] cons.flyOut allows labels to show up when mouse is hovered over
 -- @param[opt=''] cons.message initial message to show on the label
 -- @param[opt='white'] cons.fgColor optional foreground colour - colour to use for text on the label
--- @param[opt='black'] cons.bgColor optional background colour - colour of the whole label
+-- @param[opt='dark grey'] cons.color optional background colour - colour of the whole label
 -- @param[opt=1] cons.fillBg 1 if the background is to be filled, 0 for no background
+-- @param container the container to add as a child
 function Geyser.Label:addChild(cons, container)
   cons = cons or {}
   cons.type = cons.type or "nestedLabel"
@@ -1147,9 +1336,9 @@ function Geyser.Label:onRightClick(event)
   end
 end
 
---- finds and returns a right click menu item
--- @param name Name of the menu item. If the menu item has a parent name needs to be given as "Parent.MenuItemName"
--- @param only used internally the right click menu [optional]
+--- Finds and returns a right click menu item.
+-- @param name name of the menu item. If the menu item has a parent name needs to be given as "Parent.MenuItemName"
+-- @param parent only used internally the right click menu [optional]
 -- @param findParent only used internally to return a Parent [optional]
 function Geyser.Label:findMenuElement(name, parent, findParent)
   if not name then
@@ -1358,9 +1547,10 @@ end
 -- @field angleDeltaY A number corresponding with the horizontal wheel motion. For most devices, this number is in increments of 120
 -- @table mouseWheelEvent
 
---- Returns a table in the format of getTextFormat which describes the default formatting created by any stylesheets
+--- Returns a table in the format of getTextFormat which describes the default formatting created by any stylesheets.
 -- which are applied to the label.
--- @see https://wiki.mudlet.org/w/Manual:Lua_Functions#getLabelFormat and https://wiki.mudlet.org/w/Manual:Lua_Functions#getTextFormat
+-- See: <a href="https://wiki.mudlet.org/w/Manual:Lua_Functions#getLabelFormat">https://wiki.mudlet.org/w/Manual:Lua_Functions#getLabelFormat</a>
+-- See: <a href="https://wiki.mudlet.org/w/Manual:Lua_Functions#getTextFormat">https://wiki.mudlet.org/w/Manual:Lua_Functions#getLabelFormat</a>
 function Geyser.Label:getFormat()
   return getLabelFormat(self.name)
 end

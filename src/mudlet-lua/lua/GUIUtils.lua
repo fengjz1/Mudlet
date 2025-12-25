@@ -286,7 +286,8 @@ color_table["YellowGreen"]            = { 154, 205, 50 }
 --- @see createGauge
 function moveGauge(gaugeName, x, y)
   assert(gaugesTable[gaugeName], "moveGauge: no such gauge exists.")
-  assert(x and y, "moveGauge: need to have both X and Y dimensions.")
+  assert(type(x) == 'number', 'moveGauge: bad argument #2 type (expected number, got '..type(x)..'!)')
+  assert(type(y) == 'number', 'moveGauge: bad argument #3 type (expected number, got '..type(y)..'!)')
   moveWindow(gaugeName .. "_back", x, y)
   moveWindow(gaugeName .. "_text", x, y)
   -- save new values in table
@@ -417,6 +418,7 @@ end
 ---   PadHexNum("F")
 ---   </pre>
 function PadHexNum(incString)
+  assert(type(incString) == 'string', 'PadHexNum: bad argument #1 type (expected string, got '..type(incString)..'!)')
   local l_Return = incString
   if tonumber(incString, 16) < 16 then
     if tonumber(incString, 16) < 10 then
@@ -442,6 +444,7 @@ end
 ---
 --- @see showColor
 function RGB2Hex(red, green, blue)
+  assert(red, "RGB2Hex: require at least one argument (color_name or r,g,b)!")
   local l_Red, l_Green, l_Blue = 0, 0, 0
   if green == nil then
     -- Not an RGB but a "color" instead!
@@ -465,6 +468,7 @@ end
 ---   echo(red .. "." .. green .. "." .. blue )
 ---   </pre>
 function getRGB(colorName)
+  assert(type(colorName) == 'string', 'getRGB: bad argument #1 type (expected string, got '..type(colorName)..'!)')
   local red = color_table[colorName][1]
   local green = color_table[colorName][2]
   local blue = color_table[colorName][3]
@@ -504,8 +508,8 @@ function createGauge(windowname, gaugeName, width, height, x, y, gaugeText, r, g
     height = width
     width = gaugeName
     gaugeName = windowname
-    windowname= nil
-   end
+    windowname = nil
+  end
   windowname = windowname or "main"
   gaugeText = gaugeText or ""
   if type(r) == "string" then
@@ -516,6 +520,11 @@ function createGauge(windowname, gaugeName, width, height, x, y, gaugeText, r, g
     -- default colors
     r, g, b = 128, 128, 128
   end
+
+  assert(type(x) == 'number', 'createGauge: expected x to be a number (got '..type(x)..'!)')
+  assert(type(y) == 'number', 'createGauge: expected y to be a number (got '..type(y)..'!)')
+  assert(type(width) == 'number', 'createGauge: expected width to be a number (got '..type(width)..'!)')
+  assert(type(height) == 'number', 'createGauge: expected height to be a number (got '..type(height)..'!)')
 
   orientation = orientation or "horizontal"
   assert(table.contains({ "horizontal", "vertical", "goofy", "batty" }, orientation), "createGauge: orientation must be horizontal, vertical, goofy, or batty")
@@ -554,7 +563,8 @@ end
 ---   </pre>
 function setGauge(gaugeName, currentValue, maxValue, gaugeText)
   assert(gaugesTable[gaugeName], "setGauge: no such gauge exists.")
-  assert(currentValue and maxValue, "setGauge: need to have both current and max values.")
+  assert(tonumber(currentValue) ~= nil, 'setGauge: bad argument #2 type (unable to convert '..type(currentValue)..' to a number!)')
+  assert(tonumber(maxValue) ~= nil, 'setGauge: bad argument #3 type (unable to convert '..type(maxValue)..' to a number!)')
   local value = currentValue / maxValue
   -- save new values in table
   gaugesTable[gaugeName].value = value
@@ -590,17 +600,24 @@ end
 ---   <pre>
 ---   createConsole("myConsoleWindow", 8, 80, 20, 200, 400)
 ---   </pre>
-function createConsole(windowname, consoleName, fontSize, charsPerLine, numberOfLines, Xpos, Ypos)
+function createConsole(windowName, consoleName, fontSize, charsPerLine, numberOfLines, Xpos, Ypos)
   if Ypos == nil then
     Ypos = Xpos
     Xpos = numberOfLines
     numberOfLines = charsPerLine
     charsPerLine = fontSize
     fontSize = consoleName
-    consoleName = windowname
-    windowname = "main"
+    consoleName = windowName
+    windowName = "main"
   end
-  createMiniConsole(windowname, consoleName, 0, 0, 1, 1)
+  assert(type(windowName) == 'string', 'createConsole: invalid type for windowName (expected string, got '..type(windowName)..'!)')
+  assert(type(consoleName) == 'string', 'createConsole: invalid type for consoleName (expected string, got '..type(consoleName)..'!)')
+  assert(type(fontSize) == 'number', 'createConsole: invalid type for fontSize (expected number, got '..type(fontSize)..'!)')
+  assert(type(charsPerLine) == 'number', 'createConsole: invalid type for charsPerLine (expected number, got '..type(charsPerLine)..'!)')
+  assert(type(numberOfLines) == 'number', 'createConsole: invalid type for numberOfLines (expected number, got '..type(numberOfLines)..'!)')
+  assert(type(Xpos) == 'number', 'createConsole: invalid type for Xpos (expected number, got '..type(Xpos)..'!)')
+  assert(type(Ypos) == 'number', 'createConsole: invalid type for Ypos (expected number, got '..type(Ypos)..'!)')
+  createMiniConsole(windowName, consoleName, 0, 0, 1, 1)
   setMiniConsoleFontSize(consoleName, fontSize)
   local x, y = calcFontSize( fontSize )
   resizeWindow(consoleName, x * charsPerLine, y * numberOfLines)
@@ -631,6 +648,8 @@ end
 ---   replaceAll("you", "you and me")
 ---   </pre>
 function replaceAll(word, what, keepColor)
+  assert(type(word) == 'string', 'replaceAll: bad argument #1 type (expected string, got '..type(word)..'!)')
+  assert(type(what) == 'string', 'replaceAll: bad argument #2 type (expected string, got '..type(what)..'!)')
   local getCurrentLine, selectSection, replace = getCurrentLine, selectSection, replace
   local startp, endp = 1, 1
   while true do
@@ -650,14 +669,13 @@ end
 ---
 --- @see deleteLine
 function replaceLine(window, text)
+  assert(type(window) == 'string', 'replaceLine: bad argument #1 type (expected string, got '..type(window)..'!)')
   if not text then
     selectCurrentLine()
-    text = window
   else
     selectCurrentLine(window)
   end
-  replace("")
-  insertText(text)
+  replace(window, text)
 end
 
 
@@ -697,7 +715,7 @@ end
 --- @see fg
 --- @see showColors
 function bg(console, colorName)
-  local colorName = colorName or console
+  colorName = colorName or console
   if colorName == nil then
     error("bg: bad argument #1 type (color name as string expected, got nil)!")
   end
@@ -725,7 +743,7 @@ end
 --- @see bg
 --- @see showColors
 function fg(console, colorName)
-  local colorName = colorName or console
+  colorName = colorName or console
   if colorName == nil then
     error("fg: bad argument #1 type (color name as string expected, got nil)!")
   end
@@ -960,7 +978,8 @@ end
 --- <b><u>TODO</u></b> resizeGauge(gaugeName, width, height)
 function resizeGauge(gaugeName, width, height)
   assert(gaugesTable[gaugeName], "resizeGauge: no such gauge exists.")
-  assert(width and height, "resizeGauge: need to have both width and height.")
+  assert(type(width) == 'number', 'resizeGauge: bad argument #2 type (expected number, got '..type(width)..'!)')
+  assert(type(height) == 'number', 'resizeGauge: bad argument #3 type (expected number, got '..type(height)..')')
   resizeWindow(gaugeName .. "_back", width, height)
   resizeWindow(gaugeName .. "_text", width, height)
   -- save new values in table
@@ -976,6 +995,7 @@ function setGaugeStyleSheet(gaugeName, css, cssback, csstext)
     return
   end -- mudlet 1.0.5 and lower compatibility
   assert(gaugesTable[gaugeName], "setGaugeStyleSheet: no such gauge exists.")
+  assert(type(css) == 'string', 'setGaugeStyleSheet: bad argument #2 type (expected string, got '..type(css)..'!)')
   setLabelStyleSheet(gaugeName .. "_back", cssback or css)
   setLabelStyleSheet(gaugeName .. "_front", css)
   setLabelStyleSheet(gaugeName .. "_text", csstext or "")
@@ -985,6 +1005,7 @@ end
 -- used by xEcho for creating formatting span tags for labels
 -- fmt is a table of format options as returned by getTextFormat
 function getHTMLformat(fmt)
+  assert(type(fmt) == 'table', 'getHTMLformat: bad argument #1 type (expected table, got '..type(fmt)..'!)')
   -- next two lines effectively invert the colors if fmt.reverse is true
   local type = type
   local sfmt = string.format
@@ -1055,6 +1076,7 @@ end
 -- used by xEcho for getting the default format for a label, taking into account
 -- the background color setting and stylesheet
 function getLabelFormat(win)
+  assert(win, "getLabelFormat: requires at least one argument")
   local r,g,b = 192, 192, 192
   local reset = {
     foreground = { r, g, b },
@@ -1112,6 +1134,8 @@ function getLabelFormat(win)
   end
   return reset
 end
+
+local processedEchoToHTML
 
 if rex then
   _Echos = {
@@ -1252,6 +1276,72 @@ if rex then
     end,
   }
 
+-- internal function which takes a processed echo table and a table of 'default'
+-- formatting options and returns it as an html string. used by xEcho for Label
+-- outputs and the html output for c/d/hecho2html functions.
+processedEchoToHTML = function(t, reset)
+  reset = reset or {
+    background = { 0, 0, 0 },
+    bold = false,
+    foreground = { 255, 255, 255 },
+    italic = false,
+    overline = false,
+    reverse = false,
+    strikeout = false,
+    underline = false
+  }
+  local format = table.deepcopy(reset)
+  local result = getHTMLformat(format)
+  for _,v in ipairs(t) do
+    local formatChanged = false
+    if type(v) == "table" then
+      if v.fg then
+        format.foreground = {v.fg[1], v.fg[2], v.fg[3]}
+        formatChanged = true
+      end
+      if v.bg then
+        format.background = {v.bg[1], v.bg[2], v.bg[3]}
+        formatChanged = true
+      end
+    elseif v == "\27bold" then
+      format.bold = true
+      formatChanged = true
+    elseif v == "\27boldoff" then
+      format.bold = false
+      formatChanged = true
+    elseif v == "\27italics" then
+      format.italic = true
+      formatChanged = true
+    elseif v == "\27italicsoff" then
+      format.italic = false
+      formatChanged = true
+    elseif v == "\27underline" then
+      format.underline = true
+      formatChanged = true
+    elseif v == "\27underlineoff" then
+      format.underline = false
+      formatChanged = true
+    elseif v == "\27strikethrough" then
+      format.strikeout = true
+      formatChanged = true
+    elseif v == "\27strikethroughoff" then
+      format.strikeout = false
+      formatChanged = true
+    elseif v == "\27overline" then
+      format.overline = true
+      formatChanged = true
+    elseif v == "\27overlineoff" then
+      format.overline = false
+      formatChanged = true
+    elseif v == "\27reset" then
+      format = table.deepcopy(reset)
+      formatChanged = true
+    end
+    v = formatChanged and getHTMLformat(format) or v
+    result = result .. v
+  end
+  return result
+end
 
   --- Generic color echo and insert function (allowing hecho, decho, cecho, hinsertText, dinsertText and cinsertText).
   ---
@@ -1320,60 +1410,8 @@ if rex then
       if func ~= "echo" then
         return nil, "you cannot use echoLink, echoPopup, or insertText with Labels"
       end
-      local result = ""
       local reset = getLabelFormat(win)
-      local format = table.deepcopy(reset)
-      if format.bold or format.italic or format.overline or format.strikeout or format.underline then
-        result = getHTMLformat(format)
-      end
-      for _,v in ipairs(t) do
-        local formatChanged = false
-        if type(v) == "table" then
-          if v.fg then
-            format.foreground = {v.fg[1], v.fg[2], v.fg[3]}
-            formatChanged = true
-          end
-          if v.bg then
-            format.background = {v.bg[1], v.bg[2], v.bg[3]}
-            formatChanged = true
-          end
-        elseif v == "\27bold" then
-          format.bold = true
-          formatChanged = true
-        elseif v == "\27boldoff" then
-          format.bold = false
-          formatChanged = true
-        elseif v == "\27italics" then
-          format.italic = true
-          formatChanged = true
-        elseif v == "\27italicsoff" then
-          format.italic = false
-          formatChanged = true
-        elseif v == "\27underline" then
-          format.underline = true
-          formatChanged = true
-        elseif v == "\27underlineoff" then
-          format.underline = false
-          formatChanged = true
-        elseif v == "\27strikethrough" then
-          format.strikeout = true
-          formatChanged = true
-        elseif v == "\27strikethroughoff" then
-          format.strikeout = false
-          formatChanged = true
-        elseif v == "\27overline" then
-          format.overline = true
-          formatChanged = true
-        elseif v == "\27overlineoff" then
-          format.overline = false
-          formatChanged = true
-        elseif v == "\27reset" then
-          format = table.deepcopy(reset)
-          formatChanged = true
-        end
-        v = formatChanged and getHTMLformat(format) or v
-        result = result .. v
-      end
+      local result = processedEchoToHTML(t, reset)
       echo(win, result)
     else
       local t = _Echos.Process(str, style)
@@ -1759,6 +1797,7 @@ if rex then
   end
 
   function cecho2ansi(text)
+    assert(type(text) == 'string', 'cecho2ansi: bad argument #1 type (expected string, got '..type(text)..'!)')
     local colorPattern = _Echos.Patterns.Color[1]
     local result = ""
     for str, color in rex.split(text, colorPattern) do
@@ -1779,6 +1818,7 @@ if rex then
   --@see cecho
   --@see cinsertText
   function cfeedTriggers(text)
+    assert(type(text) == 'string', 'cfeedTriggers: bad argument #1 type (expected string, got '..type(text)..'!)')
     feedTriggers(cecho2ansi(text) .. "\n")
     echo("")
   end
@@ -1790,6 +1830,7 @@ if rex then
   --@see decho
   --@see dinsertText
   function decho2ansi(text)
+    assert(type(text) == 'string', 'decho2ansi: bad argument #1 type (expected string, got '..type(text)..'!)')
     local colorPattern = _Echos.Patterns.Decimal[1]
     local result = ""
     for str, color, res in rex.split(text, colorPattern) do
@@ -1811,6 +1852,7 @@ if rex then
   --@see decho
   --@see dinsertText
   function dfeedTriggers(text)
+    assert(type(text) == 'string', 'dfeedTriggers: bad argument #1 type (expected string, got '..type(text)..'!)')
     feedTriggers(decho2ansi(text) .. "\n")
     echo("")
   end
@@ -1822,6 +1864,7 @@ if rex then
   --@see hecho
   --@see hinsertText
   function hecho2ansi(text)
+    assert(type(text) == 'string', 'hecho2ansi: bad argument #1 type (expected string, got '..type(text)..'!)')
     local colorPattern = _Echos.Patterns.Hex[1]
     local result = ""
     for str, color, res in rex.split(text, colorPattern) do
@@ -1844,6 +1887,8 @@ if rex then
   --@see hecho
   --@see hinsertText
   function hfeedTriggers(text)
+    assert(type(text) == 'string', 'hfeedTriggers: bad argument #1 type (expected string, got '..type(text)..'!)')
+
     feedTriggers(hecho2ansi(text) .. "\n")
     echo("")
   end
@@ -1854,6 +1899,7 @@ else
   -- NOT LUADOC
   -- See xEcho/another cecho for description.
   function cecho(window, text)
+    assert(type(window) == 'string', 'cecho: bad argument #1 type (expected string, got '..type(window)..'!)')
     local win = text and window
     local s = text or window
     if win == "main" then
@@ -1895,6 +1941,7 @@ else
   -- NOT LUADOC
   -- See xEcho/another decho for description.
   function decho(window, text)
+    assert(type(window) == 'string', 'decho: bad argument #1 type (expected string, got '..type(window)..'!)')
     local win = text and window
     local s = text or window
     if win == "main" then
@@ -1945,7 +1992,7 @@ end
 do
   local oldreplace = replace
   function replace(arg1, arg2, arg3)
-    local windowname, text, keepcolor
+    local windowname, text, keepcolor = "main", nil, false
 
     if arg1 and arg2 and arg3 ~= nil then
       windowname, text, keepcolor = arg1, arg2, arg3
@@ -1957,27 +2004,18 @@ do
       text = arg1
     end
 
-    local selection = {getSelection()}
+    local selection = {getSelection(windowname)}
     if _comp(selection, {"", 0, 0}) then
       return nil, "replace: nothing is selected to be replaced. Did selectString return -1?"
     end
     text = text or ""
 
     if keepcolor then
-      if not windowname then
-        setBgColor(getBgColor())
-        setFgColor(getFgColor())
-      else
-        setBgColor(windowname, getBgColor(windowname))
-        setFgColor(windowname, getFgColor(windowname))
-      end
+      setBgColor(windowname, getBgColor(windowname))
+      setFgColor(windowname, getFgColor(windowname))
     end
 
-    if windowname then
-      oldreplace(windowname, text)
-    else
-      oldreplace(text)
-    end
+    oldreplace(windowname, text)
   end
 end
 
@@ -1996,20 +2034,23 @@ end
 
 -- function to convert a cecho formatted string to a nonformatted string
 function cecho2string(text)
+  assert(type(text) == 'string', 'cecho2string: bad argument #1 type (expected string, got '..type(text)..'!)')
   return x2string(text, "Color")
 end
 
 -- function to convert a decho formatted string to a nonformatted string
 function decho2string(text)
+  assert(type(text) == 'string', 'decho2string: bad argument #1 type (expected string, got '..type(text)..'!)')
   return x2string(text, "Decimal")
 end
 
 -- function to convert a hecho formatted string to a nonformatted string
 function hecho2string(text)
+  assert(type(text) == 'string', 'hecho2string: bad argument #1 type (expected string, got '..type(text)..'!)')
   return x2string(text, "Hex")
 end
 
-local ansiPattern = rex.new("\\e\\[([0-9:;]+?)m")
+local ansiPattern = rex.new("\\e\\[([0-9:;]*?)m")
 
 -- function for converting a raw ANSI string into plain strings
 function ansi2string(text)
@@ -2024,6 +2065,7 @@ end
 function ansi2decho(text, ansi_default_color)
   assert(type(text) == 'string', 'ansi2decho: bad argument #1 type (expected string, got '..type(text)..'!)')
   local lastColour = ansi_default_color
+  local coloursToUse = nil
 
   -- match each set of ansi tags, ie [0;36;40m and convert to decho equivalent.
   -- this works since both ansi colours and echo don't need closing tags and map to each other
@@ -2047,7 +2089,7 @@ function ansi2decho(text, ansi_default_color)
     for i = 0, 7 do
       lightColours[i] = convertindex(i+8)
     end
-    local coloursToUse = colours
+    coloursToUse = coloursToUse or colours
 
     -- since fg/bg can come in different order and we need them as fg:bg for decho, collect
     -- the data first, then assemble it in the order we need at the end
@@ -2059,7 +2101,7 @@ function ansi2decho(text, ansi_default_color)
       local code = t[i]
       local formatCodeHandled = false
 
-      if code == '0' or code == '00' then
+      if code == '0' or code == '00' or code == '' then
         -- reset attributes
         output[#output + 1] = "<r>"
         fg, bg = nil, nil
@@ -2178,6 +2220,8 @@ end
 --- @param windowName Optional name of the window to use the function on
 --- @param colorString hex string for the color to use
 function setHexFgColor(windowName, colorString)
+  assert(type(windowName) == 'string', 'setHexFgColor: bad argument #1 type (expected string, got '..type(windowName)..'!)')
+
   local win = colorString and windowName
   local col = colorString or windowName
 
@@ -2206,6 +2250,8 @@ end
 --- @param windowName Optional name of the window to use the function on
 --- @param colorString hex string for the color to use
 function setHexBgColor(windowName, colorString)
+  assert(type(windowName) == 'string', 'setHexBgColor: bad argument #1 type (expected string, got '..type(windowName)..'!)')
+
   local win = colorString and windowName
   local col = colorString or windowName
 
@@ -2237,6 +2283,7 @@ local insertFuncs = {[echo] = insertText, [cecho] = cinsertText, [decho] = dinse
 ---
 --- @see prefix
 function suffix(what, func, fgc, bgc, window)
+  assert(type(what) == 'string', 'suffix: bad argument #1 type (expected string, got '..type(what)..'!)')
   window = window or "main"
   func = insertFuncs[func] or func or insertText
   local length = utf8.len(getCurrentLine(window))
@@ -2258,6 +2305,7 @@ end
 ---
 --- @see suffix
 function prefix(what, func, fgc, bgc, window)
+  assert(type(what) == 'string', 'prefix: bad argument #1 type (expected string, got '..type(what)..'!)')
   window = window or "main"
   func = insertFuncs[func] or func or insertText
   moveCursor(window, 0, getLineNumber(window))
@@ -2326,6 +2374,7 @@ end
 --- @param windowName Optional name of the window to replace on
 --- @param text The text to replace the selection with.
 function creplace(window, text)
+  assert(type(window) == 'string', 'creplace: bad argument #1 type (expected string, got '..type(window)..'!)')
   xReplace(window, text, 'c')
 end
 
@@ -2333,6 +2382,7 @@ end
 --- @param windowName Optional name of the window to replace on
 --- @param text The text to replace the selection with.
 function creplaceLine(window, text)
+  assert(type(window) == 'string', 'creplaceLine: bad argument #1 type (expected string, got '..type(window)..'!)')
   if not text then
     selectCurrentLine()
   else
@@ -2345,6 +2395,7 @@ end
 --- @param windowName Optional name of the window to replace on
 --- @param text The text to replace the selection with.
 function dreplace(window, text)
+  assert(type(window) == 'string', 'dreplace: bad argument #1 type (expected string, got '..type(window)..'!)')
   xReplace(window, text, 'd')
 end
 
@@ -2352,6 +2403,7 @@ end
 --- @param windowName Optional name of the window to replace on
 --- @param text The text to replace the selection with.
 function dreplaceLine(window, text)
+  assert(type(window) == 'string', 'dreplaceLine: bad argument #1 type (expected string, got '..type(window)..'!)')
   if not text then
     selectCurrentLine()
   else
@@ -2364,6 +2416,7 @@ end
 --- @param windowName Optional name of the window to replace on
 --- @param text The text to replace the selection with.
 function hreplace(window, text)
+  assert(type(window) == 'string', 'hreplace: bad argument #1 type (expected string, got '..type(window)..'!)')
   xReplace(window, text, 'h')
 end
 
@@ -2371,6 +2424,7 @@ end
 --- @param windowName Optional name of the window to replace on
 --- @param text The text to replace the selection with.
 function hreplaceLine(window, text)
+  assert(type(window) == 'string', 'hreplaceLine: bad argument #1 type (expected string, got '..type(window)..'!)')
   if not text then
     selectCurrentLine()
   else
@@ -2466,8 +2520,19 @@ local function copy2color(name,win,str,inst)
   if not start then
     error(name..": string not found",3)
   end
-  local style, endspan, result, r, g, b, rb, gb, bb, cr, cg, cb, crb, cgb, cbb
+  local style, endspan, result, r, g, b, rb, gb, bb, cr, cg, cb, crb, cgb, cbb, char
   local selectSection, getFgColor, getBgColor = selectSection, getFgColor, getBgColor
+  local conversions = {
+    ["¦"] = "&brvbar;",
+    ["×"] = "&times;",
+    ["«"] = "&#171;",
+    ["»"] = "&raquo;",
+    ["<"] = "&lt;",
+    [">"] = "&gt;",
+    ['"'] = "&quot;",
+    ["'"] = "&#39;",
+    ["&"] = "&amp;"
+  }
   if name == "copy2html" then
     style = "%s<span style=\'color: rgb(%d,%d,%d);background: rgb(%d,%d,%d);'>%s"
     endspan = "</span>"
@@ -2486,20 +2551,19 @@ local function copy2color(name,win,str,inst)
       rb,gb,bb = getBgColor()
     end
 
+    char = utf8.sub(line, index, index)
+    if name == "copy2html" then
+      char = conversions[char] or char -- replace HTML entities (if they are in the table)
+    end
+
     if r ~= cr or g ~= cg or b ~= cb or rb ~= crb or gb ~= cgb or bb ~= cbb then
       cr,cg,cb,crb,cgb,cbb = r,g,b,rb,gb,bb
-      result = string.format(style, result and (result..endspan) or "", r, g, b, rb, gb, bb, utf8.sub(line, index, index))
+      result = string.format(style, result and (result..endspan) or "", r, g, b, rb, gb, bb, char)
     else
-      result = result .. utf8.sub(line, index, index)
+      result = result .. char
     end
   end
   result = result .. endspan
-  if name == "copy2html" then
-    local conversions = {["¦"] = "&brvbar;", ["×"] = "&times;", ["«"] = "&#171;", ["»"] = "&raquo;"}
-    for from, to in pairs(conversions) do
-      result = string.gsub(result, from, to)
-    end
-  end
   return result
 end
 
@@ -2670,4 +2734,248 @@ function closestColor(r,g,b)
     end
   end
   return cname
+end
+
+--- Scrolls the given window up a specified number of lines
+--- @param windowName Optional name of the window to use the function on
+--- @param lines Number of lines to scroll
+function scrollUp(window, lines)
+  if type(window) ~= "string" then window, lines = "main", window end
+  lines = tonumber(lines) or 1
+  local numLines = getLastLineNumber(window)
+  if not numLines then return nil, "window does not exist" end
+  local curScroll = getScroll(window)
+  scrollTo(window, math.max(curScroll - lines, 0))
+end
+
+--- Scrolls the given window down a specified number of lines
+--- @param windowName Optional name of the window to use the function on
+--- @param lines Number of lines to scroll
+function scrollDown(window, lines)
+  if type(window) ~= "string" then window, lines = "main", window end
+  lines = tonumber(lines) or 1
+  local numLines = getLastLineNumber(window)
+  if not numLines then return nil, "window does not exist" end
+  local curScroll = getScroll(window)
+  scrollTo(window, math.min(curScroll + lines, numLines))
+end
+
+--[[
+The following functions are to allow easily and efficiently converting from
+one color echo type to another. So from cecho to decho. decho to hecho.
+Also includes an html output option to make html logging of c/d/hecho strings
+easy.
+--]]
+
+-- lookup tables for formatting strings in c/d/hecho formats
+-- table keys chosen to match the ones in _Echos.Patterns
+local echoOutputs = {
+  Color = {
+    ["\27reset"] = "<reset>",
+    ["\27bold"] = "<b>",
+    ["\27boldoff"] = "</b>",
+    ["\27italics"] = "<i>",
+    ["\27italicsoff"] = "</i>",
+    ["\27underline"] = "<u>",
+    ["\27underlineoff"] = "</u>",
+    ["\27strikethrough"] = "<s>",
+    ["\27strikethroughoff"] = "</s>",
+    ["\27overline"] = "<o>",
+    ["\27overlineoff"] = "</o>",
+  },
+  Decimal = {
+    ["\27reset"] = "<r>",
+    ["\27bold"] = "<b>",
+    ["\27boldoff"] = "</b>",
+    ["\27italics"] = "<i>",
+    ["\27italicsoff"] = "</i>",
+    ["\27underline"] = "<u>",
+    ["\27underlineoff"] = "</u>",
+    ["\27strikethrough"] = "<s>",
+    ["\27strikethroughoff"] = "</s>",
+    ["\27overline"] = "<o>",
+    ["\27overlineoff"] = "</o>",
+  },
+  Hex = {
+    ["\27reset"] = "#r",
+    ["\27bold"] = "#b",
+    ["\27boldoff"] = "#/b",
+    ["\27italics"] = "#i",
+    ["\27italicsoff"] = "#/i",
+    ["\27underline"] = "#u",
+    ["\27underlineoff"] = "#/u",
+    ["\27strikethrough"] = "#s",
+    ["\27strikethroughoff"] = "#/s",
+    ["\27overline"] = "#o",
+    ["\27overlineoff"] = "#/o",
+  }
+}
+
+-- make these items local for easier and swifter use
+local echoPatterns = _Echos.Patterns
+local echoProcess = _Echos.Process
+
+--- internal function responsible for taking the color information
+-- returned as part of the table by _Echos.Process and outputting
+-- it for a specific Xecho formatting type.
+local function processedColorsToEchoString(colorType, colors)
+  colorType = colorType:lower()
+  local result
+  if colorType == "hex" then
+    local fg,bg = "", ""
+    if colors.fg then
+      fg = string.format("%02x%02x%02x", unpack(colors.fg))
+    end
+    if colors.bg then
+      bg = string.format(",%02x%02x%02x", unpack(colors.bg))
+    end
+    result = string.format("#%s%s", fg, bg)
+  elseif colorType == "color" then
+    local fg,bg = "",""
+    if colors.fg then
+      fg = closestColor(colors.fg)
+    end
+    if colors.bg then
+      -- closestColor chokes if you provide an alpha channel for the background
+      bg = ":" .. closestColor(colors.bg[1], colors.bg[2], colors.bg[3])
+    end
+    result = string.format("<%s%s>", fg, bg)
+  elseif colorType == "decimal" then
+    local fg,bg = "", ""
+    if colors.fg then
+      fg = string.format("%d,%d,%d", unpack(colors.fg))
+    end
+    if colors.bg then
+      bg = string.format(":%d,%d,%d", colors.bg[1], colors.bg[2], colors.bg[3])
+    end
+    result = string.format("<%s%s>", fg, bg)
+  end
+  return result
+end
+
+-- internal function that powers the c/d/hecho2c/d/hecho/html functions below
+-- @tparam string str the formatted color string to transform
+-- @tparam string from the type of color formatting that str uses. What you're converting from. 'Color', 'Hex', or 'Decimal'
+-- @tparam string to the type of color formatting to output. 'Color', 'Hex', 'Decimal', or 'html'
+-- @tparam table resetFormat optional table of default formatting options to use when outputting as html.
+local function echoConverter(str, from, to, resetFormat)
+  local strType, fromType, toType, resetType = type(str), type(from), type(to), type(resetFormat)
+  local errTemplate = "bad argument #{argNum} type ({argName} as string expected, got {argType})"
+  local argNum, argName, argType
+  local err = false
+  if strType ~= "string" then
+    argNum = 1
+    argName = "str"
+    argType = strType
+    err = true
+  elseif fromType ~= "string" then
+    argNum = 2
+    argName = "from"
+    argType = fromType
+    err = true
+  elseif toType ~= "string" then
+    argNum = 3
+    argName = "to"
+    argType = toType
+    err = true
+  elseif resetFormat and resetType ~= "table" then
+    argType = resetType
+    errTemplate = "bad argument #4 type (optional resetFormat as table of formatting options expected, got {argType})"
+    err = true
+  end
+  if err then
+    printError(f(errTemplate), true, true)
+  end
+  from = from:title()
+  if not echoPatterns[from] then
+    local msg = "argument #4 (from) must be a valid echo type. Valid types are: " .. table.concat(table.keys(echoPatterns), ",")
+    printError(msg, true, true)
+  end
+  local processed = echoProcess(str, from)
+  if to:lower() == "html" then
+    return processedEchoToHTML(processed, resetFormat)
+  end
+  local outputs = echoOutputs[to]
+  if not outputs then
+    local msg = "argument #3 (to) must be a valid echo type. Valid types are: " .. table.concat(table.keys(echoOutputs), ",")
+    printError(msg, true, true)
+  end
+  local result = ""
+  for _, token in ipairs(processed) do
+    local formatter = outputs[token]
+    if formatter and token:find("\27") then
+      result = result .. formatter
+    elseif type(token) == "table" then
+      result = result .. processedColorsToEchoString(to, token)
+    else
+      result = result .. token
+    end
+  end
+  return result
+end
+
+-- converts cecho formatted string to html
+-- @tparam string str the string you're converting
+-- @tparam table resetFormat optional table of default formatting options, as returned by getTextFormat or getLabelFormat
+function cecho2html(str, resetFormat)
+  assert(type(str) == "string", "cecho2html: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Color", "html", resetFormat)
+end
+
+-- converts cecho formatted string to decho
+-- @tparam string str the string you're converting
+function cecho2decho(str)
+  assert(type(str) == "string", "cecho2decho: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Color", "Decimal")
+end
+
+-- converts cecho formatted string to hecho
+-- @tparam string str the string you're converting
+function cecho2hecho(str)
+  assert(type(str) == "string", "cecho2hecho: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Color", "Hex")
+end
+
+-- converts decho formatted string to hecho
+-- @tparam string str the string you're converting
+function decho2hecho(str)
+  assert(type(str) == "string", "decho2hecho: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Decimal", "Hex")
+end
+
+-- converts decho formatted string to cecho
+-- @tparam string str the string you're converting
+function decho2cecho(str)
+  assert(type(str) == "string", "decho2cecho: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Decimal", "Color")
+end
+
+-- converts decho formatted string to html
+-- @tparam string str the string you're converting
+-- @tparam table resetFormat optional table of default formatting options, as returned by getTextFormat or getLabelFormat
+function decho2html(str, resetFormat)
+  assert(type(str) == "string", "decho2html: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Decimal", "html", resetFormat)
+end
+
+-- converts hecho formatted string to decho
+-- @tparam string str the string you're converting
+function hecho2decho(str)
+  assert(type(str) == "string", "hecho2decho: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Hex", "Decimal")
+end
+
+-- converts hecho formatted string to cecho
+-- @tparam string str the string you're converting
+function hecho2cecho(str)
+  assert(type(str) == "string", "hecho2cecho: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Hex", "Color")
+end
+
+-- converts hecho formatted string to html
+-- @tparam string str the string you're converting
+-- @tparam table resetFormat optional table of default formatting options, as returned by getTextFormat or getLabelFormat
+function hecho2html(str, resetFormat)
+  assert(type(str) == "string", "hecho2html: bad argument #1 type (string expected, got " .. type(str) .. ")")
+  return echoConverter(str, "Hex", "html", resetFormat)
 end

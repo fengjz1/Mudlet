@@ -100,8 +100,9 @@ SavedVariables = {}
 
 
 --- Sends a list of commands to the MUD. You can use this to send some things at once instead of having
---- to use multiple send() commands one after another.
+--- to use multiple send() commands one after another.  Optionally you can delay the sends using a number.
 ---
+--- @param seconds [optional] number of seconds to delay the sending of commands
 --- @param ... list of commands
 --- @param echoTheValue optional boolean flag (default value is true) which determine if value should
 ---   be echoed back on client.
@@ -116,6 +117,10 @@ SavedVariables = {}
 ---   send ("wield shield")
 ---   send ("say ha!")
 ---   </pre>
+---   with a time delay of 2 seconds between each command:
+---   <pre>
+---   sendAll(2, "stand", "wield shield", "say ha!")
+---   </pre>
 --- @usage Use sendAll and do not echo sent command on the main window.
 ---   <pre>
 ---   sendAll("stand", "wield shield", "say ha!", false)
@@ -123,15 +128,24 @@ SavedVariables = {}
 ---
 --- @see send
 function sendAll(...)
+  local time = 0
   local args = { ... }
   local echo = true
+
   if type(args[#args]) == 'boolean' then
     echo = table.remove(args, #args)
   end
-  for i, v in ipairs(args) do
-    if type(v) == 'string' then
-      send(v, echo)
+  if type(args[1]) == 'number' then
+    time = table.remove(args, 1)
+    for i, v in ipairs(args) do
+      if type(v) == 'string' then
+        tempTimer(time*i, function() send(v, echo) end, false)
+      end
     end
+    return
+  end
+  for i, v in ipairs(args) do
+    send(v, echo)
   end
 end
 
@@ -255,8 +269,11 @@ end
 ---
 --- @see remember
 function loadVars()
+  local _sep = ""
   if string.char(getMudletHomeDir():byte()) == "/" then
-    _sep = "/" else _sep = "\\"
+    _sep = "/"
+  else
+    _sep = "\\"
   end
   local l_SettingsFile = getMudletHomeDir() .. _sep .. "SavedVariables.lua"
   local lt_VariableHolder = {}
@@ -274,8 +291,11 @@ end
 ---
 --- @see loadVars
 function saveVars()
+  local _sep = ""
   if string.char(getMudletHomeDir():byte()) == "/" then
-    _sep = "/" else _sep = "\\"
+    _sep = "/"
+  else
+    _sep = "\\"
   end
   local l_SettingsFile = getMudletHomeDir() .. _sep .. "SavedVariables.lua"
   for k, _ in pairs(_saveTable) do
@@ -479,7 +499,7 @@ end
 
 --- <b><u>TODO</u></b> speedwalk(dirString, backwards, delay, optional show)
 function speedwalk(dirString, backwards, delay, show)
-  local dirString = dirString:lower()
+  dirString = dirString:lower()
   local walkdelay = delay
   if show ~= false then show = true end
   speedwalkShow = show
@@ -562,6 +582,10 @@ function _comp(a, b)
   return true
 end
 
+--- exposes _comp as compare as it's a global, has been for years, and is also
+--- extremely useful. But documenting it as _comp is inconsistent with the rest
+--- of the API
+compare = _comp
 
 
 --- <b><u>TODO</u></b> phpTable(...) - abuse to: http://richard.warburton.it
@@ -607,7 +631,8 @@ end
 
 --- <b><u>TODO</u></b> getColorWildcard(color)
 function getColorWildcard(color)
-  local color, results, startc, endc = tonumber(color), {}, nil, nil
+  color = tonumber(color)
+  local results, startc, endc = {}, nil, nil
 
   for i = 0, string.len(line) do
     selectSection(i, 1)
@@ -692,20 +717,22 @@ function deleteFull()
   tempLineTrigger(1, 1, [[if isPrompt() then deleteLine() end]])
 end
 
-function shms(seconds, bool)
-  local seconds = tonumber(seconds)
-  assert(type(seconds) == "number", "Assertion failed for function 'shms' - Please supply a valid number.")
-
-  local s = seconds
-  local ss = string.format("%02d", math.fmod(s, 60))
-  local mm = string.format("%02d", math.fmod((s / 60 ), 60))
-  local hh = string.format("%02d", (s / (60 * 60)))
-
-  if bool then
-    cecho("<green>" .. s .. " <grey>seconds converts to: <green>" .. hh .. "<white>h,<green> " .. mm .. "<white>m <grey>and<green> " .. ss .. "<white>s.")
-  else
-    return hh, mm, ss
+function deleteMultiline(maxLines)
+  local multimatchesSize = table.size(multimatches)
+  if multimatchesSize == 0 then
+    return nil, "does not appear to be run during a multiline trigger match, please try again."
   end
+  maxLines = maxLines or multimatchesSize
+  local firstMatch = multimatches[1][1]:patternEscape()
+  for i = 1, maxLines do
+    local content = getCurrentLine()
+    deleteLine()
+    if content:find(firstMatch) then
+      return true
+    end
+    moveCursorUp()
+  end
+  return true
 end
 
 -- returns true if your Mudlet is older than the given version
@@ -1034,6 +1061,7 @@ function loadTranslations(packageName, fileName, languageCode, folder)
   folder = folder or io.exists("../translations/lua") and "../translations/lua/"
   folder = folder or io.exists("../../translations/lua") and "../../translations/lua/"
   folder = folder or io.exists(luaGlobalPath.."/../../translations/lua") and luaGlobalPath.."/../../translations/lua/"
+  folder = folder or io.exists(luaGlobalPath.."/../../../translations/lua") and luaGlobalPath.."/../../../translations/lua/"
   folder = folder or luaGlobalPath.."/translations/"
 
   assert(type(packageName) == "string", string.format("loadTranslations: bad argument #1 type (packageName as string expected, got %s)", type(packageName)))
@@ -1089,6 +1117,26 @@ function verbosePackageInstall(fileName)
   end
 end
 
+function verboseModuleInstall(fileName)
+  local ok, err = installModule(fileName)
+  local moduleName = fileName
+  -- That is all for installing, now to announce the result to the user:
+  mudlet.Locale = mudlet.Locale or loadTranslations("Mudlet")
+  if ok then
+    local successText = mudlet.Locale.moduleInstallSuccess.message
+    successText = string.format(successText, moduleName)
+    local okPrefix = mudlet.Locale.prefixOk.message
+    decho('<0,160,0>' .. okPrefix .. '<190,100,50>' .. successText .. '\n')
+    -- Light Green and Orange-ish; see cTelnet::postMessage for color comparison
+  else
+    local failureText = mudlet.Locale.moduleInstallFail.message
+    failureText = string.format(failureText, moduleName, err)
+    local warnPrefix = mudlet.Locale.prefixWarn.message
+    decho('<0,150,190>' .. warnPrefix .. '<190,150,0>' .. failureText .. '\n')
+    -- Cyan and Orange; see cTelnet::postMessage for color comparison
+  end
+end
+
 local oldInstallPackage = installPackage
 
 -- Override of original installPackage to allow installs from URL
@@ -1137,7 +1185,11 @@ function packageDrop(event, fileName, suffix)
   if not table.contains(acceptableSuffix, suffix) then
     return
   end
-  verbosePackageInstall(fileName)
+  if holdingModifiers(mudlet.keymodifier.Control) then
+    verboseModuleInstall(fileName)
+  else
+    verbosePackageInstall(fileName)
+  end
 end
 registerAnonymousEventHandler("sysDropEvent", "packageDrop")
 
@@ -1163,4 +1215,95 @@ if not ttsSpeak then --check if ttsSpeak is defined, if not then Mudlet lacks TT
   for _,fn in ipairs(funcs) do
     _G[fn] = function() debugc(string.format("%s: Mudlet was compiled without TTS capabilities", fn)) end
   end
+end
+
+local oldsetConfig = setConfig
+function setConfig(...)
+  local args = {...}
+
+  if type(args[1]) ~= "table" then
+    return oldsetConfig(...)
+  end
+
+  for k,v in pairs(args[1]) do
+    oldsetConfig(k, v)
+  end
+end
+
+local oldgetConfig = getConfig
+function getConfig(...)
+  local args = {...}
+  local result = {}
+
+  if #args == 0 then
+    -- Please sort this list alphabetically (case insensitive) as it helps to follow changes:
+    -- This list contains all configuration options that are available in both getConfig and setConfig
+    -- NOTE: Some options like "showMapInfo", "hideMapInfo" are setConfig-only write operations
+    -- Some options like "logDirectory", "specialForceMXPProcessorOn" are getConfig-only read operations  
+    local list = {
+      "advertiseScreenReader",
+      "ambiguousEAsianWidthCharacters",
+      "announceIncomingText",
+      "askTlsAvailable", 
+      "autoClearInputLine",
+      "blankLinesBehaviour",
+      "caretShortcut",
+      "commandLineHistorySaveSize",
+      "compactInputLine",
+      "controlCharacterHandling",
+      "editorAutoComplete",
+      "enableClosedCaption",
+      "enableGMCP",
+      "enableMNES",
+      "enableMSDP", 
+      "enableMSP",
+      "enableMSSP",
+      "enableMTTS",
+      "enableMXP",
+      "f3SearchEnabled",
+      "fixUnnecessaryLinebreaks",
+      "forceNewEnvironNegotiationOff",
+      "inputLineStrictUnixEndings",
+      "logDirectory",                    -- read-only in getConfig
+      "logInHTML",
+      "mapExitSize",
+      "mapInfoColor",
+      "mapperPanelVisible", 
+      "mapRoomSize",
+      "mapRoundRooms",
+      "mapShowGrid",
+      "mapShowRoomBorders",
+      "promptForMXPProcessorOn",
+      "promptForVersionInTTYPE",
+      "show3dMapView",
+      "showRoomIdsOnMap", 
+      "showSentText",
+      "showTabConnectionIndicators",
+      "showUpperLowerLevels",
+      "specialForceCharsetNegotiationOff",
+      "specialForceCompressionOff",
+      "specialForceGAOff",
+      "specialForceMxpNegotiationOff",
+      "specialForceMXPProcessorOn",      -- read-only in getConfig
+      "versionInTTYPE",
+    }
+    for _,v in ipairs(list) do
+      result[v] = oldgetConfig(v)
+    end
+    return result
+  end
+
+  if type(args[1]) == "table" then
+    for _,v in pairs(args[1]) do
+      result[v] = oldgetConfig(v)
+    end
+    return result
+  end
+
+  -- Pass all arguments to the C++ function to support enhanced API
+  return oldgetConfig(unpack(args))
+end
+
+function openMudletHomeDir()
+  openUrl("file:" .. getMudletHomeDir())
 end

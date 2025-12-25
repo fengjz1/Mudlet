@@ -1,6 +1,6 @@
 /***************************************************************************
  *   Copyright (C) 2020 by Gustavo Sousa - gustavocms@gmail.com            *
- *   Copyright (C) 2020 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2020, 2022 by Stephen Lyons - slysven@virginmedia.com   *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -25,9 +25,7 @@
 #include "TMxpTagHandlerResult.h"
 #include "utils.h"
 
-#include "pre_guard.h"
 #include <QString>
-#include "post_guard.h"
 
 class TMxpClient;
 class TMxpContext;
@@ -104,7 +102,9 @@ public:
     }
 
 protected:
-    explicit TMxpSingleTagHandler(QString tagName) : tagName(std::move(tagName)) {}
+    explicit TMxpSingleTagHandler(QString tagName)
+    : tagName(std::move(tagName))
+    {}
 };
 
 #endif //MUDLET_TMXPTAGHANDLER_H

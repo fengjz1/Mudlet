@@ -4,7 +4,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2022 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2022-2023 by Stephen Lyons - slysven@virginmedia.com    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -23,17 +23,17 @@
  ***************************************************************************/
 
 
-#include "pre_guard.h"
+#include "utils.h"
+
 #include <QMultiMap>
 #include <QPointer>
+#include <QSet>
 #include <QString>
-#include "post_guard.h"
 
 #include <list>
 
 class Host;
 class TAlias;
-
 
 class AliasUnit
 {
@@ -44,11 +44,13 @@ public:
     explicit AliasUnit(Host* pHost)
     : mpHost(pHost)
     {}
+    ~AliasUnit();
 
     std::list<TAlias*> getAliasRootNodeList() { return mAliasRootNodeList; }
     TAlias* getAlias(int id);
     void compileAll();
     TAlias* findFirstAlias(const QString& name);
+    std::vector<int> findItems(const QString& name, const bool exactMatch, const bool caseSensitive);
     bool enableAlias(const QString&);
     bool disableAlias(const QString&);
     bool killAlias(const QString& name);
@@ -58,6 +60,7 @@ public:
     void uninstall(const QString&);
     void _uninstall(TAlias* pChild, const QString& packageName);
     void reParentAlias(int childID, int oldParentID, int newParentID, int parentPosition = -1, int childPosition = -1);
+    void reParentAlias(int childID, int oldParentID, int newParentID, TreeItemInsertMode mode, int position = 0);
     bool processDataStream(const QString&);
     void stopAllTriggers();
     void reenableAllTriggers();
@@ -67,7 +70,7 @@ public:
     void doCleanup();
 
     QMultiMap<QString, TAlias*> mLookupTable;
-    std::list<TAlias*> mCleanupList;
+    QSet<TAlias*> mCleanupSet;
     QList<TAlias*> uninstallList;
 
 
@@ -90,6 +93,7 @@ private:
     int statsItemsTotal = 0;
     int statsTempItems = 0;
     int statsActiveItems = 0;
+    bool mIsProcessing = false;
 };
 
 #endif // MUDLET_ALIASUNIT_H

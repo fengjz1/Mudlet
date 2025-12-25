@@ -21,9 +21,7 @@
 
 #include "ircmessageformatter.h"
 
-#include "pre_guard.h"
 #include <IrcTextFormat>
-#include "post_guard.h"
 
 QString IrcMessageFormatter::formatMessage(IrcMessage* message, bool isForLua)
 {
@@ -161,9 +159,8 @@ QString IrcMessageFormatter::formatJoinMessage(IrcJoinMessage* message, bool isF
     Q_UNUSED(isForLua)
     if (message->flags() & IrcMessage::Own) {
         return QObject::tr("! You have joined %1 as %2").arg(message->channel(), message->nick());
-    } else {
-        return QObject::tr("! %1 has joined %2").arg(message->nick(), message->channel());
     }
+    return QObject::tr("! %1 has joined %2").arg(message->nick(), message->channel());
 }
 
 QString IrcMessageFormatter::formatKickMessage(IrcKickMessage* message, bool isForLua)
@@ -175,18 +172,17 @@ QString IrcMessageFormatter::formatKickMessage(IrcKickMessage* message, bool isF
 QString IrcMessageFormatter::formatModeMessage(IrcModeMessage* message, bool isForLua)
 {
     Q_UNUSED(isForLua)
-    QString args = message->arguments().join(" ");
+    const QString args = message->arguments().join(" ");
     if (message->isReply()) {
         return QObject::tr("! %1 mode is %2 %3").arg(message->target(), message->mode(), args);
-    } else {
-        return QObject::tr("! %1 sets mode %2 %3 %4").arg(message->nick(), message->target(), message->mode(), args);
     }
+    return QObject::tr("! %1 sets mode %2 %3 %4").arg(message->nick(), message->target(), message->mode(), args);
 }
 
 QString IrcMessageFormatter::formatMotdMessage(IrcMotdMessage* message, bool isForLua)
 {
     QString motdData;
-    for (auto line : message->lines()) {
+    for (const auto& line : message->lines()) {
         QString content, lineEnd;
         if (isForLua) {
             lineEnd = "\n";
@@ -207,11 +203,10 @@ QString IrcMessageFormatter::formatNamesMessage(IrcNamesMessage* message, bool i
     if (isForLua) {
         // lua actually needs the names for parsing, since getting a names
         // list from the UI userModel alone would be limiting to the IRC commands.
-        QString nameList = message->names().join(" ");
+        const QString nameList = message->names().join(" ");
         return QObject::tr("! %1 has %2 users: %3").arg(message->channel(), count, nameList);
-    } else {
-        return QObject::tr("! %1 has %2 users").arg(message->channel(), count);
     }
+    return QObject::tr("! %1 has %2 users").arg(message->channel(), count);
 }
 
 QString IrcMessageFormatter::formatNickMessage(IrcNickMessage* message, bool isForLua)
@@ -223,11 +218,7 @@ QString IrcMessageFormatter::formatNickMessage(IrcNickMessage* message, bool isF
 QString IrcMessageFormatter::formatNoticeMessage(IrcNoticeMessage* message, bool isForLua)
 {
     if (message->isReply()) {
-#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 14, 0))
         const QStringList params = message->content().split(" ", Qt::SkipEmptyParts);
-#else
-        const QStringList params = message->content().split(" ", QString::SkipEmptyParts);
-#endif
         const QString cmd = params.value(0);
         if (cmd.toUpper() == "PING") {
             const QString secs = formatSeconds(params.value(1).toInt());
@@ -260,7 +251,7 @@ QString IrcMessageFormatter::formatNoticeMessage(IrcNoticeMessage* message, bool
         // lua only needs the message text.
         return IrcTextFormat().toPlainText(message->content());
     } else {
-        QString content = IrcTextFormat().toHtml(message->content());
+        const QString content = IrcTextFormat().toHtml(message->content());
         return QObject::tr("&lt;%1%2&gt; [%3] %4").arg(message->nick(), pfx, message->target(), content);
     }
 }
@@ -336,16 +327,15 @@ QString IrcMessageFormatter::formatPartMessage(IrcPartMessage* message, bool isF
     Q_UNUSED(isForLua)
     if (message->reason().isEmpty()) {
         return QObject::tr("! %1 has left %2").arg(message->nick(), message->channel());
-    } else {
-        return QObject::tr("! %1 has left %2 (%3)").arg(message->nick(), message->channel(), message->reason());
     }
+    return QObject::tr("! %1 has left %2 (%3)").arg(message->nick(), message->channel(), message->reason());
 }
 
 QString IrcMessageFormatter::formatPongMessage(IrcPongMessage* message, bool isForLua)
 {
     Q_UNUSED(isForLua)
-    quint64 msec = message->timeStamp().toMSecsSinceEpoch();
-    quint64 dms = (QDateTime::currentMSecsSinceEpoch() - msec);
+    quint64 const msec = message->timeStamp().toMSecsSinceEpoch();
+    quint64 const dms = (QDateTime::currentMSecsSinceEpoch() - msec);
     return QObject::tr("! %1 replied in %2 seconds").arg(message->nick()).arg(dms / 1000.0, 4, 'f', 3, QLatin1Char('0'));
 }
 
@@ -376,9 +366,8 @@ QString IrcMessageFormatter::formatQuitMessage(IrcQuitMessage* message, bool isF
     Q_UNUSED(isForLua)
     if (message->reason().isEmpty()) {
         return QObject::tr("! %1 has quit").arg(message->nick());
-    } else {
-        return QObject::tr("! %1 has quit (%2)").arg(message->nick(), message->reason());
     }
+    return QObject::tr("! %1 has quit (%2)").arg(message->nick(), message->reason());
 }
 
 QString IrcMessageFormatter::formatTopicMessage(IrcTopicMessage* message, bool isForLua)
@@ -462,22 +451,22 @@ QString IrcMessageFormatter::formatWhoReplyMessage(IrcWhoReplyMessage* message, 
 
 QString IrcMessageFormatter::formatSeconds(int secs)
 {
-    const QDateTime time = QDateTime::fromTime_t(secs);
+    const QDateTime time = QDateTime::fromSecsSinceEpoch(secs);
     return QObject::tr("%1s").arg(time.secsTo(QDateTime::currentDateTime()));
 }
 
 QString IrcMessageFormatter::formatDuration(int secs)
 {
     QStringList idle;
-    if (int days = secs / 86400) {
+    if (const int days = secs / 86400) {
         idle += QObject::tr("%1 days").arg(days);
     }
     secs %= 86400;
-    if (int hours = secs / 3600) {
+    if (const int hours = secs / 3600) {
         idle += QObject::tr("%1 hours").arg(hours);
     }
     secs %= 3600;
-    if (int mins = secs / 60) {
+    if (const int mins = secs / 60) {
         idle += QObject::tr("%1 mins").arg(mins);
     }
     idle += QObject::tr("%1 secs").arg(secs % 60);

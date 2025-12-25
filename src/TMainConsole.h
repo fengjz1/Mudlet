@@ -4,7 +4,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2014-2016, 2018-2021 by Stephen Lyons                   *
+ *   Copyright (C) 2014-2016, 2018-2022 by Stephen Lyons                   *
  *                                               - slysven@virginmedia.com *
  *   Copyright (C) 2016 by Ian Adkins - ieadkins@gmail.com                 *
  *                                                                         *
@@ -27,12 +27,10 @@
 
 #include "TConsole.h"
 #include "TScrollBox.h"
-#include "pre_guard.h"
 #include <QFile>
 #include <QTextStream>
 #include <QWidget>
 #include <optional>
-#include "post_guard.h"
 
 #include <hunspell/hunspell.h>
 
@@ -47,9 +45,8 @@ public:
     ~TMainConsole();
 
     void resizeEvent(QResizeEvent* event) override;
-
     void resetMainConsole();
-
+    void closeEvent(QCloseEvent*) override;
     TConsole* createMiniConsole(const QString& windowname, const QString& name, int x, int y, int width, int height);
     TScrollBox* createScrollBox(const QString& windowname, const QString& name, int x, int y, int width, int height);
     bool raiseWindow(const QString& name);
@@ -57,13 +54,14 @@ public:
     bool showWindow(const QString& name);
     bool hideWindow(const QString& name);
     bool printWindow(const QString& name, const QString& text);
+    bool clear(const QString& name);
     void setProfileName(const QString&) override;
     void selectCurrentLine(std::string&);
-    std::list<int> getFgColor(std::string& buf);
-    std::list<int> getBgColor(std::string& buf);
+    std::list<int> getFgColor(QString& buf);
+    std::list<int> getBgColor(QString& buf);
     QPair<quint8, TChar> getTextAttributes(const QString&) const;
-    void luaWrapLine(std::string& buf, int line);
-    QString getCurrentLine(std::string&);
+    void luaWrapLine(QString& buf, int line);
+    QString getCurrentLine(const std::string&);
     TConsole* createBuffer(const QString& name);
     std::pair<bool, QString> setUserWindowStyleSheet(const QString& name, const QString& userWindowStyleSheet);
     std::pair<bool, QString> setUserWindowTitle(const QString& name, const QString& text);
@@ -73,23 +71,23 @@ public:
     std::pair<bool, QString> createCommandLine(const QString &windowname, const QString &name, int, int, int, int);
     QSize getUserWindowSize(const QString& windowname) const;
     std::pair<bool, QString> setCmdLineStyleSheet(const QString& name, const QString& styleSheet);
-    void setLabelStyleSheet(std::string& buf, std::string& sh);
+    void setLabelStyleSheet(std::string& buf, std::string& stylesheet);
     std::optional<QString> getLabelStyleSheet(const QString& name) const;
     std::optional<QSize> getLabelSizeHint(const QString& name) const;
     std::pair<bool, QString> deleteLabel(const QString&);
+    std::pair<bool, QString> deleteMiniConsole(const QString&);
+    std::pair<bool, QString> deleteCommandLine(const QString&);
+    std::pair<bool, QString> deleteScrollBox(const QString&);
     std::pair<bool, QString> setLabelToolTip(const QString& name, const QString& text, double duration);
     std::pair<bool, QString> setLabelCursor(const QString& name, int shape);
     std::pair<bool, QString> setLabelCustomCursor(const QString& name, const QString& pixMapLocation, int hotX, int hotY);
     bool setBackgroundImage(const QString& name, const QString& path);
     bool setBackgroundColor(const QString& name, int r, int g, int b, int alpha);
-
     void setSystemSpellDictionary(const QString&);
     void setProfileSpellDictionary();
-
     void showStatistics();
-
     const QString& getSystemSpellDictionary() const { return mSpellDic; }
-    QTextCodec* getHunspellCodec_system() const { return mpHunspellCodec_system; }
+    const QByteArray& getHunspellCodecName_system() const { return mHunspellCodecName_system; }
     Hunhandle* getHunspellHandle_system() const { return mpHunspell_system; }
     // Either returns the handle of the per profile or the shared Mudlet one or
     // nullptr depending on the state of the flags mEnableUserDictionary and
@@ -122,7 +120,7 @@ public:
     QFile mLogFile;
     QString mLogFileName;
     QTextStream mLogStream;
-    bool mLogToLogFile;
+    bool mLogToLogFile = false;
 
 
 public slots:
@@ -142,23 +140,22 @@ signals:
 private:
     // Was public in Host class but made private there and cloned to here
     // (for main TConsole) to prevent it being changed without going through the
-    // process to load in the the changed dictionary:
+    // process to load in the changed dictionary:
     QString mSpellDic;
 
     // Cloned from Host
-    bool mEnableUserDictionary;
-    bool mUseSharedDictionary;
+    bool mEnableUserDictionary = true;
+    bool mUseSharedDictionary = false;
 
     // Three handles, one for the dictionary the user choses from the system
     // one created by the mudlet class for all profiles and the third for a per
     // profile one - the last pair are built by the user and/or lua functions:
-    Hunhandle* mpHunspell_system;
-    Hunhandle* mpHunspell_shared;
-    Hunhandle* mpHunspell_profile;
+    Hunhandle* mpHunspell_system = nullptr;
+    Hunhandle* mpHunspell_shared = nullptr;
+    Hunhandle* mpHunspell_profile = nullptr;
     // The user dictionary will always use the UTF-8 codec, but the one
     // selected from the system's ones may not:
     QByteArray mHunspellCodecName_system;
-    QTextCodec* mpHunspellCodec_system;
     // To update the profile dictionary we actually have to track all the words
     // in it so we loaded the contents into this on startup and adjust it as we
     // go. Then, at the end of a session we will put the revised contents
@@ -166,6 +163,7 @@ private:
     // for the ".aff" file - this member is for the per profile option only as
     // the shared one is held by the mudlet singleton class:
     QSet<QString> mWordSet_profile;
+    bool mEnableClose = false;
 };
 
 #endif // MUDLET_TMAINCONSOLE_H

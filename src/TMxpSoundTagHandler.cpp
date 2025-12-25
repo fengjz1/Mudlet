@@ -26,14 +26,14 @@ TMxpTagHandlerResult TMxpSoundTagHandler::handleStartTag(TMxpContext& ctx, TMxpC
 {
     Q_UNUSED(ctx)
 
-    QString fileName = extractFileName(tag);
+    const QString fileName = extractFileName(tag);
 
     if (!fileName.isEmpty()) {
-        QString volume = extractVolume(tag);
-        QString loops = extractLoops(tag);
-        QString priority = extractPriority(tag);
-        QString type = extractType(tag);
-        QString url = extractUrl(tag);
+        const QString volume = extractVolume(tag);
+        const QString loops = extractLoops(tag);
+        const QString priority = extractPriority(tag);
+        const QString type = extractType(tag);
+        const QString url = extractUrl(tag);
 
         TMediaData mediaData {};
 
@@ -51,7 +51,7 @@ TMxpTagHandlerResult TMxpSoundTagHandler::handleStartTag(TMxpContext& ctx, TMxpC
         if (!loops.isEmpty()) {
             mediaData.setMediaLoops(loops.toInt());
 
-            if (mediaData.getMediaLoops() < TMediaData::MediaLoopsRepeat || mediaData.getMediaLoops() == 0) {
+            if (mediaData.mediaLoops() < TMediaData::MediaLoopsRepeat || mediaData.mediaLoops() == 0) {
                 mediaData.setMediaLoops(TMediaData::MediaLoopsDefault);
             }
         } else {
@@ -61,9 +61,9 @@ TMxpTagHandlerResult TMxpSoundTagHandler::handleStartTag(TMxpContext& ctx, TMxpC
         if (!priority.isEmpty()) {
             mediaData.setMediaPriority(priority.toInt());
 
-            if (mediaData.getMediaPriority() > TMediaData::MediaPriorityMax) {
+            if (mediaData.mediaPriority() > TMediaData::MediaPriorityMax) {
                 mediaData.setMediaPriority(TMediaData::MediaPriorityMax);
-            } else if (mediaData.getMediaPriority() < TMediaData::MediaPriorityMin) {
+            } else if (mediaData.mediaPriority() < TMediaData::MediaPriorityMin) {
                 mediaData.setMediaPriority(TMediaData::MediaPriorityMin);
             }
         } else {
@@ -78,7 +78,7 @@ TMxpTagHandlerResult TMxpSoundTagHandler::handleStartTag(TMxpContext& ctx, TMxpC
             mediaData.setMediaUrl(url);
         }
 
-        if (mediaData.getMediaFileName() == "Off" && mediaData.getMediaUrl().isEmpty()) {
+        if (mediaData.mediaFileName() == "Off" && mediaData.mediaUrl().isEmpty()) {
             client.stopMedia(mediaData);
         } else {
             client.playMedia(mediaData);

@@ -22,13 +22,11 @@
 
 #include "exitstreewidget.h"
 
-#include "pre_guard.h"
 #include <QtEvents>
-#include "post_guard.h"
 
 
-ExitsTreeWidget::ExitsTreeWidget(QWidget* pW)
-: QTreeWidget(pW)
+ExitsTreeWidget::ExitsTreeWidget(QWidget* pParent)
+: QTreeWidget(pParent)
 {
     setSelectionMode(QAbstractItemView::ExtendedSelection);
     setUniformRowHeights(true);
@@ -42,7 +40,7 @@ void ExitsTreeWidget::keyPressEvent(QKeyEvent* event)
         closePersistentEditor(currentItem(), colIndex_command);
     }
     if (event->key() == Qt::Key_Delete && hasFocus()) {
-        QList<QTreeWidgetItem*> selection = selectedItems();
+        QList<QTreeWidgetItem*> const selection = selectedItems();
         for (auto pItem : selection) {
             takeTopLevelItem(indexOfTopLevelItem(pItem));
         }

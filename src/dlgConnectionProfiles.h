@@ -23,18 +23,11 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include "pre_guard.h"
 #include "ui_connection_profiles.h"
 #include <optional>
 #include <QTimer>
 #include <QKeyEvent>
 #include <pugixml.hpp>
-#if defined(INCLUDE_OWN_QT5_KEYCHAIN)
-#include <../3rdparty/qtkeychain/keychain.h>
-#else
-#include <qt5keychain/keychain.h>
-#endif
-#include "post_guard.h"
 
 class QDir;
 
@@ -65,38 +58,42 @@ signals:
     void signal_load_profile(QString profile_name, bool alsoConnect);
 
 public slots:
-    void slot_update_name(const QString&);
-    void slot_save_name();
-    void slot_update_url(const QString&);
-    void slot_update_port(const QString&);
-    void slot_update_SSL_TSL_port(int state);
-    void slot_update_login(const QString&);
-    void slot_update_pass(const QString&);
-    void slot_update_website(const QString&);
-    void slot_deleteprofile_check(const QString&);
-    void slot_update_description();
+    void slot_updateName(const QString&);
+    void slot_saveName();
+    void slot_updateUrl(const QString&);
+    void slot_updatePort(const QString&);
+    void slot_updateSslTslPort(int state);
+    void slot_updateLogin(const QString&);
+    void slot_updatePassword(const QString&);
+// Not used:    void slot_updateWebsite(const QString&);
+    void slot_deleteProfileCheck(const QString&);
+    void slot_updateDescription();
 
-    void slot_item_clicked(QListWidgetItem*);
+    void slot_itemClicked(QListWidgetItem*);
     void slot_addProfile();
     void slot_deleteProfile();
     void slot_reallyDeleteProfile();
 
-    void slot_update_autologin(int state);
-    void slot_update_autoreconnect(int state);
-    void slot_update_discord_optin(int state);
+    void slot_updateAutoConnect(int state);
+    void slot_updateAutoReconnect(int state);
+    void slot_updateDiscordOptIn(int state);
     void slot_load();
     void slot_cancel();
-    void slot_copy_profile();
-    void slot_copy_profilesettings_only();
+    void slot_copyProfile();
+    void slot_copyOnlySettingsOfProfile();
+    void indicatePackagesInstallOnConnect(QStringList packages);
 
 
 protected:
     bool eventFilter(QObject*, QEvent*) override;
+    void loadPasswordFromSettings(const QString& profile_name);
+    void ensurePasswordLoadedThenConnect(bool alsoConnect);
+    bool hasPendingKeychainOperation(const QString& profile_name) const;
 
 
 private:
-    void copyFolder(const QString& sourceFolder, const QString& destFolder);
-    QString getDescription(const QString& hostUrl, quint16 port, const QString& profile_name) const;
+    static bool copyFolder(const QString& sourceFolder, const QString& destFolder);
+    QString getDescription(const QString& profile_name) const;
     bool validateConnect();
     void updateDiscordStatus();
     bool validateProfile();
@@ -117,10 +114,14 @@ private:
     void deleteSecurePassword(const QString& profile) const;
     void setupMudProfile(QListWidgetItem*, const QString& mudServer, const QString& serverDescription, const QString& iconFileName);
     void reallyDeleteProfile(const QString& profile);
+    void continueProfileSave(QListWidgetItem* pItem, const QString& newProfileName,
+                           const QString& newProfileHost, const QString& newProfilePort,
+                           const int newProfileSslTsl);
     void setItemName(QListWidgetItem*, const QString&) const;
     QIcon customIcon(const QString&, const std::optional<QColor>&) const;
     void addLetterToProfileSearch(const int);
     inline void clearNotificationArea();
+    void loadPasswordAsync(const QString& profileName);
 
     // split into 3 properties so each one can be checked individually
     // important for creation of a folder on disk, for example: name has
@@ -134,6 +135,7 @@ private:
     QPalette mOKPalette;
     QPalette mErrorPalette;
     QPalette mReadOnlyPalette;
+    QAction* mpCopyProfile = nullptr;
     QPushButton* offline_button = nullptr;
     QPushButton* connect_button = nullptr;
     QLineEdit* delete_profile_lineedit = nullptr;
@@ -147,17 +149,23 @@ private:
     QVector<QColor> mCustomIconColors;
     QTimer mSearchTextTimer;
     QString mSearchText;
+    QTimer* mPasswordSaveTimer = nullptr;
+
+    // Async connection handling
+    QString mPendingProfileLoad;  // Profile name waiting for password load
+    bool mPendingConnect = false; // Whether to connect (true) or just load (false)
+    bool mKeychainOperationInProgress = false;  // Track if keychain op is active
 
 
 private slots:
-    void slot_profile_menu(QPoint pos);
-    void slot_set_custom_icon();
-    void slot_set_custom_color();
-    void slot_reset_custom_icon();
+    void slot_profileContextMenu(QPoint pos);
+    void slot_setCustomIcon();
+    void slot_setCustomColor();
+    void slot_resetCustomIcon();
     void slot_togglePasswordVisibility(const bool);
-    void slot_password_saved(QKeychain::Job* job);
-    void slot_password_deleted(QKeychain::Job* job);
     void slot_reenableAllProfileItems();
+    void slot_loadPasswordAsync();
+    void slot_passwordTextChanged();
 };
 
 

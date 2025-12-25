@@ -24,7 +24,6 @@
  ***************************************************************************/
 
 
-#include "pre_guard.h"
 #include "ui_irc.h"
 #include <Irc>
 #include <IrcBuffer>
@@ -39,7 +38,6 @@
 #include <IrcUserModel>
 
 #include <QPointer>
-#include "post_guard.h"
 
 #include "utils.h"
 
@@ -64,7 +62,7 @@ public:
     inline static int DefaultHostPort = 6667;
     inline static bool DefaultHostSecure = false;
     inline static QString DefaultNickName = qsl("Mudlet");
-    inline static QStringList DefaultChannels = QStringList() << qsl("Mudlet");
+    inline static QStringList DefaultChannels = QStringList() << qsl("#mudlet");
     inline static int DefaultMessageBufferLimit = 5000;
 
 
@@ -129,7 +127,7 @@ private:
 
     void showEvent(QShowEvent* event) override;
 
-    Host* mpHost = nullptr;
+    QPointer<Host> mpHost;
     bool mIrcStarted = false;
     IrcCompleter* completer = nullptr;
     IrcCommandParser* commandParser = nullptr;

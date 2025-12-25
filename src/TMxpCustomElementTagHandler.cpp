@@ -87,25 +87,38 @@ TMxpTagHandlerResult TMxpCustomElementTagHandler::handleEndTag(TMxpContext& ctx,
 //              <send href='help 1024;' hint='Click for help on 1024;' expire=help>
 MxpStartTag TMxpCustomElementTagHandler::resolveElementDefinition(const TMxpElement& element, MxpStartTag* definitionTag, MxpStartTag* customTag) const
 {
-    auto mapping = [this, customTag, element](const MxpTagAttribute& attr) {
+    auto mapping = [customTag, element](const MxpTagAttribute& attr) {
         if (!attr.hasValue()) {
             return MxpTagAttribute(mapAttributes(element, attr.getName(), customTag));
-        } else {
-            if (attr.isNamed("hint")) { // not needed according to the spec, but kept to avoid changes for the user interface
-                return MxpTagAttribute(attr.getName(), mapAttributes(element, attr.getValue().toUpper(), customTag));
-            } else {
-                return MxpTagAttribute(attr.getName(), mapAttributes(element, attr.getValue(), customTag));
-            }
         }
+        return MxpTagAttribute(attr.getName(), mapAttributes(element, attr.getValue(), customTag));
     };
 
-    return definitionTag->transform(mapping);
+    // Transform the definition tag's attributes with mapped values
+    auto result = definitionTag->transform(mapping);
+    
+    // Collect all attributes from the transformed result
+    QList<MxpTagAttribute> allAttrs;
+    for (int i = 0; i < result.getAttributesCount(); ++i) {
+        allAttrs.append(result.getAttribute(i));
+    }
+    
+    // Add any attributes from the custom tag that aren't already present
+    for (int i = 0; i < customTag->getAttributesCount(); ++i) {
+        const auto& attr = customTag->getAttribute(i);
+        if (!result.hasAttribute(attr.getName())) {
+            allAttrs.append(attr);
+        }
+    }
+    
+    // Return a new tag with all combined attributes
+    return MxpStartTag(result.getName(), allAttrs, result.isEmpty());
 }
 
 QString TMxpCustomElementTagHandler::mapAttributes(const TMxpElement& element, const QString& input, MxpStartTag* tag)
 {
-    auto mapEntityNameToTagAttributeValue = [element, tag](const QString& input) {
-        QString attrName = input.mid(1, input.size() - 2);
+    auto mapEntityNameToTagAttributeValue = [element, tag](const QString& text) {
+        QString attrName = text.mid(1, text.size() - 2);
         // get attribute value by NAME
         // <!EL help "<send href='help &desc;' hint='Click for help on &desc;' expire=help>" ATT='desc'>
         // <help desc="1024">1024</help>
@@ -121,7 +134,11 @@ QString TMxpCustomElementTagHandler::mapAttributes(const TMxpElement& element, c
             return tag->getAttribute(attrIndex).getName();
         }
 
-        return input;
+        // If an attribute was not given, use its default value - if defined:
+        if (element.defaultValues.contains(attrName.toLower())) {
+            return element.defaultValues.value(attrName.toLower());
+        }
+        return text;
     };
 
     return TEntityResolver::interpolate(input, mapEntityNameToTagAttributeValue);
@@ -151,6 +168,9 @@ const QMap<QString, QString>& TMxpCustomElementTagHandler::parseFlagAttributes(c
             values[attrName] = tag->getAttributeValue(attrName);
         } else if (tag->getAttributesCount() > i) {
             values[attrName] = tag->getAttribute(i).getName();
+        } else if (el.defaultValues.contains(attrName)) {
+            // if we have no explicit value for the attribute, but a default, use that one.
+            values[attrName] = el.defaultValues.value(attrName);
         }
     }
     return values;

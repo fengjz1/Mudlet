@@ -1,42 +1,49 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install --no-install-recommends -y \
     build-essential \
     ccache \
+    clang \
     clang-format \
     clang-tidy \
-    clazy \
     cmake \
     gdb \
     git \
-    libboost-all-dev \
     libboost-dev \
+    libboost-all-dev \
     libglib2.0-dev \
     libglu1-mesa-dev \
     libgstreamer1.0-dev \
     libhunspell-dev \
-    liblua5.1-dev \
+    liblua5.1-0-dev \
     libpcre3-dev \
-    libpugixml-dev \
-    libpulse-dev \
-    libqt5opengl5-dev \
-    libsecret-1-dev \
-    libyajl-dev \
     libzip-dev \
+    libyajl-dev \
+    libpulse-dev \
+    libpugixml-dev \
+    libqt6opengl6-dev \
+    libqt6texttospeech6-dev \
+    libsecret-1-dev \
     lua-filesystem \
-    lua-rex-pcre \
     lua-sql-sqlite3 \
     lua-zip \
-    lua5.1 \
     luarocks \
+    lua5.1 \
     mesa-common-dev \
-    qt5-default \
-    qtmultimedia5-dev \
-    qttools5-dev \
-    qt5keychain-dev \
+    qtkeychain-qt6-dev \
+    qmake6-bin \
+    qt6-tools-dev \
+    qt6-tools-dev-tools \
+    qt6-base-dev \
+    qtchooser \
     qtcreator \
-    valgrind \
+    qt6-speech-dev \
+    qt6-speech-flite-plugin \
+    qt6-speech-speechd-plugin \
+    qt6-multimedia-dev \
+    qt6-tools-dev \
+    ubuntu-restricted-extras \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 

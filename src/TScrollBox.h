@@ -20,10 +20,8 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include "pre_guard.h"
 #include <QScrollArea>
 #include <QPointer>
-#include "post_guard.h"
 
 class Host;
 
@@ -46,10 +44,7 @@ class TScrollBoxWidget : public QWidget
     Q_OBJECT
 
 public:
-    Q_DISABLE_COPY(TScrollBoxWidget)
-#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 13, 0))
-    Q_DISABLE_MOVE(TScrollBoxWidget)
-#endif
+    Q_DISABLE_COPY_MOVE(TScrollBoxWidget)
     explicit TScrollBoxWidget(QWidget* pW = nullptr);
     ~TScrollBoxWidget();
     void childEvent(QChildEvent* event) override;

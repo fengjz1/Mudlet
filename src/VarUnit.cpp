@@ -1,7 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2013 by Chris Mitchell                                  *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2021 by Stephen Lyons - slysven@virginmedia..com        *
+ *   Copyright (C) 2021-2022 by Stephen Lyons - slysven@virginmedia..com   *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -23,25 +23,33 @@
 #include "VarUnit.h"
 
 #include "TVar.h"
+#include "utils.h"
 
-#include "pre_guard.h"
+#include <QDebug>
+#include <QLocale>
 #include <QTreeWidgetItem>
-#include "post_guard.h"
 
 
-VarUnit::VarUnit() : base()
+VarUnit::VarUnit()
+: base(nullptr)
 {
+}
+
+VarUnit::~VarUnit()
+{
+    // Delete the base TVar and all its children (recursively via TVar destructor)
+    delete base;
 }
 
 bool VarUnit::isHidden(TVar* var)
 {
-    if (var->getName() == "_G") { // we never hide global
+    if (var->getName() == qsl("_G")) { // we never hide global
         return false;
     }
-    if (hidden.contains(shortVarName(var).join("."))) {
+    if (hidden.contains(shortVarName(var).join(qsl(".")))) {
         return true;
     }
-    return hiddenByUser.contains(shortVarName(var).join("."));
+    return hiddenByUser.contains(shortVarName(var).join(qsl(".")));
 }
 
 
@@ -56,21 +64,74 @@ bool VarUnit::isHidden(const QString& fullname)
     return hiddenByUser.contains(fullname);
 }
 
-void VarUnit::addPointer(const void* p)
+void VarUnit::addPointer(const void* pointer)
 {
-    pointers.insert(p);
+    mPointers.insert(pointer);
 }
 
-bool VarUnit::shouldSave(QTreeWidgetItem* p)
+bool VarUnit::shouldSave(QTreeWidgetItem* pWidgetItem)
 {
-    auto var = getWVar(p);
+    auto var = getWVar(pWidgetItem);
 
     return !(!var || var->getValueType() == 6 || var->isReference());
 }
 
 bool VarUnit::shouldSave(TVar* var)
 {
-    return !(var->getValueType() == 6 || var->isReference());
+    if (var->getValueType() == 6 || var->isReference()) {
+        return false;
+    }
+
+    // Check if table is too large (max 10,000 items)
+    if (var->getValueType() == LUA_TTABLE) {
+        const int itemCount = countTableItems(var);
+        if (itemCount > 10000) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+int VarUnit::countTableItems(TVar* var)
+{
+    int count = 0;
+    const QList<TVar*> children = var->getChildren(false);
+
+    for (TVar* child : children) {
+        count++;
+        // Recursively count items in nested tables
+        if (child->getValueType() == LUA_TTABLE) {
+            count += countTableItems(child);
+        }
+    }
+
+    return count;
+}
+
+QString VarUnit::getUnsaveableReason(TVar* var)
+{
+    if (var->getValueType() == LUA_TFUNCTION) {
+        //: Tooltip explaining why a Lua function cannot be saved
+        return tr("Lua functions cannot be saved.");
+    }
+
+    if (var->isReference()) {
+        //: Tooltip explaining why a referenced variable cannot be saved
+        return tr("Referenced variables cannot be saved.");
+    }
+
+    if (var->getValueType() == LUA_TTABLE) {
+        const int itemCount = countTableItems(var);
+        if (itemCount > 10000) {
+            //: Tooltip explaining why a large table cannot be saved, recommending alternative methods
+            return tr("This table has %1 items, exceeding the 10,000 item limit for saved variables. "
+                      "Use <b>table.save()</b> and <b>table.load()</b> instead for better performance with large tables.")
+                .arg(QLocale::system().toString(itemCount));
+        }
+    }
+
+    return QString();
 }
 
 void VarUnit::buildVarTree(QTreeWidgetItem* p, TVar* var, bool showHidden)
@@ -90,10 +151,11 @@ void VarUnit::buildVarTree(QTreeWidgetItem* p, TVar* var, bool showHidden)
             if (isSaved(child)) {
                 pItem->setCheckState(0, Qt::Checked);
             }
-            if (!shouldSave(child)) { // 6 is lua_tfunction, parent must be saveable as well if not global
+            if (!shouldSave(child)) {
                 pItem->setFlags(pItem->flags() & ~(Qt::ItemIsDropEnabled | Qt::ItemIsDragEnabled | Qt::ItemIsUserCheckable));
                 pItem->setForeground(0, QBrush(QColor("grey")));
-                pItem->setToolTip(0, QString());
+                const QString reason = getUnsaveableReason(child);
+                pItem->setToolTip(0, reason.isEmpty() ? QString() : utils::richText(reason));
             }
             pItem->setData(0, Qt::UserRole, child->getValueType());
             QIcon icon;
@@ -172,26 +234,26 @@ QStringList VarUnit::varName(TVar* var)
 QStringList VarUnit::shortVarName(TVar* var)
 {
     QStringList names;
-    if (!var || var->getName() == "_G") {
+    if (!var || var->getName() == qsl("_G")) {
         names << "";
         return names;
     }
     names << var->getName();
-    TVar* p = var->getParent();
-    while (p && p->getName() != "_G") {
-        names.insert(0, p->getName());
-        p = p->getParent();
+    TVar* pParent = var->getParent();
+    while (pParent && pParent->getName() != qsl("_G")) {
+        names.insert(0, pParent->getName());
+        pParent = pParent->getParent();
     }
     return names;
 }
 
 void VarUnit::addVariable(TVar* var)
 {
-    QString n = varName(var).join(".");
+    const QString fullName = varName(var).join(qsl("."));
     // pointers.insert(var->pointer);
-    varList.insert(n);
+    variableSet.insert(fullName);
     if (var->hidden) {
-        hidden.insert(shortVarName(var).join("."));
+        hidden.insert(shortVarName(var).join(qsl(".")));
     }
 }
 
@@ -199,9 +261,9 @@ void VarUnit::addHidden(TVar* var, int user)
 {
     var->hidden = true;
     if (user) {
-        hiddenByUser.insert(shortVarName(var).join("."));
+        hiddenByUser.insert(shortVarName(var).join(qsl(".")));
     } else {
-        hidden.insert(shortVarName(var).join("."));
+        hidden.insert(shortVarName(var).join(qsl(".")));
     }
 }
 
@@ -212,9 +274,9 @@ void VarUnit::addHidden(const QString& var)
 
 void VarUnit::removeHidden(TVar* var)
 {
-    QString n = shortVarName(var).join(".");
-    hidden.remove(n);
-    hiddenByUser.remove(n);
+    const QString fullName = shortVarName(var).join(qsl("."));
+    hidden.remove(fullName);
+    hiddenByUser.remove(fullName);
     var->hidden = false;
 }
 
@@ -227,32 +289,32 @@ void VarUnit::removeHidden(const QString& name)
 
 void VarUnit::addSavedVar(TVar* var)
 {
-    QString n = shortVarName(var).join(".");
+    const QString fullName = shortVarName(var).join(qsl("."));
     var->saved = true;
-    savedVars.insert(n);
+    savedVars.insert(fullName);
 }
 
 void VarUnit::removeSavedVar(TVar* var)
 {
-    QString n = shortVarName(var).join(".");
-    savedVars.remove(n);
+    const QString fullName = shortVarName(var).join(qsl("."));
+    savedVars.remove(fullName);
     var->saved = false;
 }
 
 bool VarUnit::isSaved(TVar* var)
 {
-    QString n = shortVarName(var).join(".");
-    return (savedVars.contains(n) || var->saved);
+    const QString fullName = shortVarName(var).join(qsl("."));
+    return (savedVars.contains(fullName) || var->saved);
 }
 
 void VarUnit::removeVariable(TVar* var)
 {
-    varList.remove(varName(var).join("."));
+    variableSet.remove(varName(var).join(qsl(".")));
 }
 
 bool VarUnit::varExists(TVar* var)
 {
-    return ((var->kpointer && pointers.contains(var->kpointer)) || (var->vpointer && pointers.contains(var->vpointer)));
+    return ((var->pKey && mPointers.contains(var->pKey)) || (var->pValue && mPointers.contains(var->pValue)));
 }
 
 TVar* VarUnit::getBase()
@@ -260,16 +322,18 @@ TVar* VarUnit::getBase()
     return base;
 }
 
-void VarUnit::setBase(TVar* t)
+void VarUnit::setBase(TVar* pVariable)
 {
-    base = t;
+    base = pVariable;
 }
 
 void VarUnit::clear()
 {
-    // delete base;
+    // Delete the base TVar and all its children (recursively via TVar destructor)
+    delete base;
+    base = nullptr;
     tVars.clear();
     wVars.clear();
-    varList.clear();
-    pointers.clear();
+    variableSet.clear();
+    mPointers.clear();
 }

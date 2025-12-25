@@ -26,7 +26,15 @@ bool TMxpFormattingTagsHandler::supports(TMxpContext& ctx, TMxpClient& client, M
     Q_UNUSED(ctx)
     Q_UNUSED(client)
 
-    return tag->isNamed(qsl("B")) || tag->isNamed(qsl("I")) || tag->isNamed(qsl("U"));
+    return tag->isNamed(qsl("B")) || tag->isNamed(qsl("BOLD")) || tag->isNamed(qsl("STRONG")) ||
+           tag->isNamed(qsl("H")) || tag->isNamed(qsl("HIGH")) ||
+           tag->isNamed(qsl("I")) || tag->isNamed(qsl("ITALIC")) || tag->isNamed(qsl("EM")) ||
+           tag->isNamed(qsl("U")) || tag->isNamed(qsl("UNDERLINE")) ||
+           tag->isNamed(qsl("S")) || tag->isNamed(qsl("STRIKEOUT")) ||
+           // Additional HTML tags - recognized but not styled differently:
+           tag->isNamed(qsl("H1")) || tag->isNamed(qsl("H2")) || tag->isNamed(qsl("H3")) ||
+           tag->isNamed(qsl("H4")) || tag->isNamed(qsl("H5")) || tag->isNamed(qsl("H6")) ||
+           tag->isNamed(qsl("SMALL")) || tag->isNamed(qsl("TT"));
 }
 
 TMxpTagHandlerResult TMxpFormattingTagsHandler::handleStartTag(TMxpContext& ctx, TMxpClient& client, MxpStartTag* tag)
@@ -49,12 +57,18 @@ TMxpTagHandlerResult TMxpFormattingTagsHandler::handleEndTag(TMxpContext& ctx, T
 
 void TMxpFormattingTagsHandler::setAttribute(TMxpClient& client, MxpTag* tag, bool value) const
 {
-    if (tag->isNamed("B")) {
+    if (tag->isNamed("B") || tag->isNamed("BOLD") || tag->isNamed("STRONG") || tag->isNamed("H") || tag->isNamed("HIGH")) {
         client.setBold(value);
-    } else if (tag->isNamed("I")) {
+    } else if (tag->isNamed("I") || tag->isNamed("ITALIC") || tag->isNamed("EM")) {
         client.setItalic(value);
-    } else if (tag->isNamed("U")) {
+    } else if (tag->isNamed("U") || tag->isNamed("UNDERLINE")) {
         client.setUnderline(value);
+    } else if (tag->isNamed("S") || tag->isNamed("STRIKEOUT")) {
+        client.setStrikeOut(value);
+    } else if (tag->isNamed("H1") || tag->isNamed("H2") || tag->isNamed("H3") ||
+               tag->isNamed("H4") || tag->isNamed("H5") || tag->isNamed("H6") ||
+               tag->isNamed("SMALL") || tag->isNamed("TT")) {
+        // Recognized but no styling applied
     } else {
         // do nothing
     }

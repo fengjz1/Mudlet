@@ -4,7 +4,7 @@
 /***************************************************************************
  *   Copyright (C) 2013 by Chris Mitchell                                  *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2020 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2020, 2023 by Stephen Lyons - slysven@virginmedia.com   *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -25,13 +25,17 @@
 
 #include "TVar.h"
 
-#include "pre_guard.h"
 #include <QScopedPointer>
 #include <QSet>
-#include "post_guard.h"
+
+#include <utility>
 
 extern "C" {
+#if defined(INCLUDE_VERSIONED_LUA_HEADERS)
+#include <lua5.1/lua.h>
+#else
 #include <lua.h>
+#endif
 }
 
 
@@ -64,14 +68,14 @@ public:
     bool loadVar(TVar* var);
     bool reparentCVariable(TVar* from, TVar* to, TVar* curVar);
     bool reparentVariable(QTreeWidgetItem*, QTreeWidgetItem*, QTreeWidgetItem*);
-    bool validMove(QTreeWidgetItem*);
+    std::pair<bool, QString> validMove(QTreeWidgetItem*);
     void getAllChildren(TVar* var, QList<TVar*>* list);
     lua_State* getState();
     static int onPanic(lua_State*);
 
 private:
-    int depth;
-    lua_State* L;
+    int depth = 0;
+    lua_State* mL;
     QSet<TVar> hiddenVars;
     QScopedPointer<VarUnit> varUnit;
     QList<int> lrefs;

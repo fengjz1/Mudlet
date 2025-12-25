@@ -26,14 +26,14 @@ TMxpTagHandlerResult TMxpMusicTagHandler::handleStartTag(TMxpContext& ctx, TMxpC
 {
     Q_UNUSED(ctx)
 
-    QString fileName = extractFileName(tag);
+    const QString fileName = extractFileName(tag);
 
     if (!fileName.isEmpty()) {
-        QString volume = extractVolume(tag);
-        QString loops = extractLoops(tag);
-        QString musicContinue = extractMusicContinue(tag);
-        QString type = extractType(tag);
-        QString url = extractUrl(tag);
+        const QString volume = extractVolume(tag);
+        const QString loops = extractLoops(tag);
+        const QString musicContinue = extractMusicContinue(tag);
+        const QString type = extractType(tag);
+        const QString url = extractUrl(tag);
 
         TMediaData mediaData {};
 
@@ -51,7 +51,7 @@ TMxpTagHandlerResult TMxpMusicTagHandler::handleStartTag(TMxpContext& ctx, TMxpC
         if (!loops.isEmpty()) {
             mediaData.setMediaLoops(loops.toInt());
 
-            if (mediaData.getMediaLoops() < TMediaData::MediaLoopsRepeat || mediaData.getMediaLoops() == 0) {
+            if (mediaData.mediaLoops() < TMediaData::MediaLoopsRepeat || mediaData.mediaLoops() == 0) {
                 mediaData.setMediaLoops(TMediaData::MediaLoopsDefault);
             }
         } else {
@@ -76,7 +76,7 @@ TMxpTagHandlerResult TMxpMusicTagHandler::handleStartTag(TMxpContext& ctx, TMxpC
             mediaData.setMediaUrl(url);
         }
 
-        if (mediaData.getMediaFileName() == "Off" && mediaData.getMediaUrl().isEmpty()) {
+        if (mediaData.mediaFileName() == "Off" && mediaData.mediaUrl().isEmpty()) {
             client.stopMedia(mediaData);
         } else {
             client.playMedia(mediaData);

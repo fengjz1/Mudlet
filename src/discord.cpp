@@ -22,11 +22,9 @@
 #include "discord.h"
 #include "mudlet.h"
 
-#include "pre_guard.h"
 #include <QtDebug>
 #include <QHash>
 #include <string.h>
-#include "post_guard.h"
 
 // Uncomment this to provide some additional qDebug() output:
 // #define DEBUG_DISCORD 1
@@ -65,7 +63,7 @@ Discord::Discord(QObject* parent)
 #if defined(Q_OS_WIN64)
     // Only defined on 64 bit Windows
     mpLibrary.reset(new QLibrary(qsl("discord-rpc64")));
-#elif defined(Q_OS_WIN32)
+#elif defined(Q_OS_WINDOWS)
     // Defined on both 32 and 64 bit Windows
     mpLibrary.reset(new QLibrary(qsl("discord-rpc32")));
 #else
@@ -112,7 +110,7 @@ Discord::Discord(QObject* parent)
     Discord_Initialize(mHostApplicationIDs.value(nullptr).toUtf8().constData(), mpHandlers, 0, nullptr);
 
     // mudlet instance is not available in this constructor as it's still being initialised, so postpone the connection
-    QTimer::singleShot(0, [this]() {
+    QTimer::singleShot(0, this, [this]() {
         Q_ASSERT(mudlet::self());
         connect(mudlet::self(), &mudlet::signal_tabChanged, this, &Discord::UpdatePresence);
 
@@ -216,7 +214,7 @@ void Discord::setEndTimeStamp(Host* pHost, int64_t epochTimeStamp)
 
 void Discord::setParty(Host* pHost, int partySize)
 {
-    int validPartySize = qMax(0, partySize);
+    const int validPartySize = qMax(0, partySize);
     if (validPartySize) {
         // Is more than zero:
         if (mPartyMax.value(pHost) < validPartySize) {
@@ -238,8 +236,8 @@ void Discord::setParty(Host* pHost, int partySize)
 
 void Discord::setParty(Host* pHost, int partySize, int partyMax)
 {
-    int validPartySize = qMax(0, partySize);
-    int validPartyMax = qMax(0, partyMax);
+    const int validPartySize = qMax(0, partySize);
+    const int validPartyMax = qMax(0, partyMax);
 
     if (validPartyMax) {
         // We have a party max size that is a positive number - so use the
@@ -259,7 +257,7 @@ void Discord::setParty(Host* pHost, int partySize, int partyMax)
 
 void Discord::timerEvent(QTimerEvent* event)
 {
-    Q_UNUSED(event);
+    Q_UNUSED(event)
 
     if (mLoaded) {
         Discord_RunCallbacks();
@@ -328,7 +326,7 @@ void Discord::UpdatePresence()
 #if defined(DEBUG_DISCORD)
         qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - no current active Host instance, sending update using built-in Mudlet ApplicationID:\n" << tempPresence;
 #endif
-        DiscordRichPresence convertedPresence(tempPresence.convert());
+        DiscordRichPresence const convertedPresence(tempPresence.convert());
         Discord_UpdatePresence(&convertedPresence);
 
         return;
@@ -457,7 +455,7 @@ void Discord::UpdatePresence()
     qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - sending update:\n" << *pDiscordPresence;
 #endif
     // Convert our stored presence into the format that the RPC library wants:
-    DiscordRichPresence convertedPresence(pDiscordPresence->convert());
+    DiscordRichPresence const convertedPresence(pDiscordPresence->convert());
     Discord_UpdatePresence(&convertedPresence);
 }
 
@@ -535,18 +533,17 @@ QString Discord::deduceGameName(const QString& address)
 }
 
 // Returns true in First if this is a MUD we know about (and have an Icon for in
-// on the Mudlet Discord erver!) and the deduced name in Second - if the
+// on the Mudlet Discord server!) and the deduced name in Second - if the
 // first is true.
 QPair<bool, QString> Discord::gameIntegrationSupported(const QString& address)
 {
-    QString deducedName = deduceGameName(address);
+    const QString deducedName = deduceGameName(address);
 
     // Handle using localhost as an off-line testing case
     if (deducedName == QLatin1String("localhost")) {
         return qMakePair(true, deducedName);
-    } else {
-        return qMakePair((!deducedName.isEmpty() && mKnownGames.contains(deducedName)), deducedName);
     }
+    return qMakePair((!deducedName.isEmpty() && mKnownGames.contains(deducedName)), deducedName);
 }
 
 bool Discord::libraryLoaded()
@@ -558,7 +555,7 @@ bool Discord::libraryLoaded()
 // quint64, or qulonglong)
 bool Discord::setApplicationID(Host* pHost, const QString& text)
 {
-    QString oldID = mHostApplicationIDs.value(pHost);
+    const QString oldID = mHostApplicationIDs.value(pHost);
     if (oldID == text) {
         // No change so do nothing
         return true;
@@ -584,9 +581,8 @@ bool Discord::setApplicationID(Host* pHost, const QString& text)
         UpdatePresence();
 
         return true;
-    } else {
-        return false;
     }
+    return false;
 }
 
 void Discord::resetData(Host* pHost){

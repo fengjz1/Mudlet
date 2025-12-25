@@ -23,9 +23,7 @@
  ***************************************************************************/
 
 
-#include "pre_guard.h"
 #include <QTreeWidget>
-#include "post_guard.h"
 
 
 class ExitsTreeWidget : public QTreeWidget
@@ -54,7 +52,7 @@ class ExitsTreeWidget : public QTreeWidget
 
 public:
     Q_DISABLE_COPY(ExitsTreeWidget)
-    explicit ExitsTreeWidget(QWidget* pW);
+    explicit ExitsTreeWidget(QWidget* pParent);
     void keyPressEvent(QKeyEvent* event) override;
 };
 

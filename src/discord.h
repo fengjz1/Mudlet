@@ -22,7 +22,6 @@
 
 #include "Host.h"
 
-#include "pre_guard.h"
 #include <functional>
 #include <utility>
 #include <QDebug>
@@ -31,7 +30,6 @@
 #include <QLibrary>
 #include "../3rdparty/discord/rpc/include/discord_register.h"
 #include "../3rdparty/discord/rpc/include/discord_rpc.h"
-#include "post_guard.h"
 
 /*
  * From the discord headers and on-line documentation:
@@ -95,8 +93,8 @@ public:
     void setJoinSecret(const QString&);
     void setMatchSecret(const QString&);
     void setSpectateSecret(const QString&);
-    void setPartySize(const int n) { mPartySize = n; }
-    void setPartyMax(const int n) { mPartyMax = n; }
+    void setPartySize(const int size) { mPartySize = size; }
+    void setPartyMax(const int maximum) { mPartyMax = maximum; }
     DiscordRichPresence convert() const;
     QString getStateText() const { return mState; }
     QString getDetailText() const { return mDetails; }
@@ -136,8 +134,8 @@ private:
 // Note "inline" is REQUIRED:
 inline QDebug& operator<<(QDebug& debug, const localDiscordPresence& ldp)
 {
-    QDebugStateSaver saver(debug);
-    Q_UNUSED(saver);
+    const QDebugStateSaver saver(debug);
+    Q_UNUSED(saver)
 
     QString result = qsl("localDiscordPresence(\n"
                                     "    mDetails: \"%1\"  mState: \"%2\" mInstance: %3\n"

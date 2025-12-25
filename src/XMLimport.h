@@ -27,7 +27,6 @@
 
 #include "dlgTriggerEditor.h"
 
-#include "pre_guard.h"
 #include <QApplication>
 #include <QFile>
 #include <QMap>
@@ -35,7 +34,6 @@
 #include <QPointer>
 #include <QXmlStreamReader>
 #include <QClipboard>
-#include "post_guard.h"
 
 class Host;
 class TAction;
@@ -45,7 +43,7 @@ class TScript;
 class TTimer;
 class TTrigger;
 class TVar;
-
+class TRoom;
 
 class XMLimport : public QXmlStreamReader
 {
@@ -54,14 +52,13 @@ class XMLimport : public QXmlStreamReader
 public:
     explicit XMLimport(Host*);
     virtual ~XMLimport() {}
-    bool importPackage(QFile*, QString packageName = QString(), int moduleFlag = 0, QString* pVersionString = nullptr);
-    std::pair<dlgTriggerEditor::EditorViewType, int> importFromClipboard();
+    std::pair<bool, QString> importPackage(QFile*, QString packageName = QString(), int moduleFlag = 0, QString* pVersionString = nullptr);
+    std::pair<EditorViewType, int> importFromClipboard();
 
 private:
     const QString YES = qsl("yes");
 
-    std::pair<dlgTriggerEditor::EditorViewType, int> readPackage();
-    void readUnknownPackage();
+    std::pair<EditorViewType, int> readPackage();
 
     void readHostPackage();
     int readTriggerPackage();
@@ -75,36 +72,32 @@ private:
     void readMap();
     void readRoom(QMultiHash<int, int>&, unsigned int*);
     void readRooms(QMultiHash<int, int>&);
+    void readRoomFeature(TRoom*);
+    void readRoomFeatures(TRoom*);
     void readEnvColor();
     void readEnvColors();
     void readArea();
     void readAreas();
     void readHelpPackage();
 
-    void readUnknownHostElement();
-    void readUnknownTriggerElement();
-    void readUnknownTimerElement();
-    void readUnknownAliasElement();
-    void readUnknownActionElement();
-    void readUnknownScriptElement();
-    void readUnknownKeyElement();
+    void readUnknownElement(const QString&);
 
-    void readHostPackage(Host*);
+    void readHost(Host*);
     void readLegacyMapInfoContributors();
     void readMapInfoContributor();
     void readProfileShortcut();
     void readStopWatchMap();
-    int readTriggerGroup(TTrigger*);
-    int readTimerGroup(TTimer*);
-    int readAliasGroup(TAlias*);
-    int readActionGroup(TAction*);
-    int readScriptGroup(TScript*);
-    int readKeyGroup(TKey*);
-    void readVariableGroup(TVar*);
+    int readTrigger(TTrigger*);
+    int readTimer(TTimer*);
+    int readAlias(TAlias*);
+    int readAction(TAction*);
+    int readScript(TScript*);
+    int readKey(TKey*);
+    void readVariable(TVar*);
     void readHiddenVariables();
 
-    void readStringList(QStringList&);
-    void readIntegerList(QList<int>&, const QString&);
+    void readStringList(QStringList&, const QString&);
+    void readIntegerList(QList<int>&, const QString& parentName, const QString &whatIsParent);
     void readModulesDetailsMap(QMap<QString, QStringList>&);
     void getVersionString(QString&);
     QString readScriptElement();
@@ -115,23 +108,23 @@ private:
 
     QPointer<Host> mpHost;
     QString mPackageName;
-    TTrigger* mpTrigger;
-    TTimer* mpTimer;
-    TAlias* mpAlias;
-    TKey* mpKey;
-    TAction* mpAction;
-    TScript* mpScript;
-    TVar* mpVar;
-    bool gotTrigger;
-    bool gotTimer;
-    bool gotAlias;
-    bool gotKey;
-    bool gotAction;
-    bool gotScript;
-    int module;
-    int mMaxRoomId;
-    quint8 mVersionMajor;
-    quint16 mVersionMinor; // Cannot be a quint8 as that only allows x.255 for the decimal
+    TTrigger* mpTrigger = nullptr;
+    TTimer* mpTimer = nullptr;
+    TAlias* mpAlias = nullptr;
+    TKey* mpKey = nullptr;
+    TAction* mpAction = nullptr;
+    TScript* mpScript = nullptr;
+    TVar* mpVar = nullptr;
+    bool gotTrigger = false;
+    bool gotTimer = false;
+    bool gotAlias = false;
+    bool gotKey = false;
+    bool gotAction = false;
+    bool gotScript = false;
+    int module = 0;
+    int mMaxRoomId = 0;
+    quint8 mVersionMajor = 1; // 0 to 255
+    quint16 mVersionMinor = 0; // 0 to 999 for 3 digit decimal value. Cannot be a quint8 as that only allows x.255 for the decimal
 };
 
 #endif // MUDLET_XMLEXPORT_H

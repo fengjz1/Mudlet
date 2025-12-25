@@ -24,17 +24,17 @@
  ***************************************************************************/
 
 
-#include "pre_guard.h"
 #include "ui_mapper.h"
 #include <QDir>
 #include <QMainWindow>
 #include <QPointer>
-#include "post_guard.h"
 
 class Host;
 class TMap;
+struct MapInfoProperties;
 #if defined(INCLUDE_3DMAPPER)
-class GLWidget;
+#include "glwidget_integration.h"
+class QOpenGLWidget;
 #endif
 
 
@@ -46,33 +46,48 @@ public:
     Q_DISABLE_COPY(dlgMapper)
     dlgMapper(QWidget*, Host*, TMap*);
 #if defined(INCLUDE_3DMAPPER)
-    GLWidget* glWidget = nullptr;
+    QOpenGLWidget* glWidget = nullptr;
 #endif
     void updateAreaComboBox();
-    void setDefaultAreaShown(bool);
-    bool getDefaultAreaShown() { return mShowDefaultArea; }
     void resetAreaComboBoxToPlayerRoomArea();
+    // The member variable is the source for this bit of information:
+    bool isIn3DMode() const { return mIs3DMode; }
     bool isFloatAndDockable() const;
+    int getCurrentShownAreaIndex();
+    void setFont(const QFont&);
+    void recreate3DWidget();
 
 public slots:
     void slot_toggleRoundRooms(const bool);
-    void slot_toggleShowRoomIDs(int s);
-    void slot_toggleShowRoomNames(int s);
-    void slot_toggleStrongHighlight(int v);
+    void slot_toggleShowRoomIDs(int toggle);
+    void slot_toggleShowRoomNames(int toggle);
+    void slot_toggleStrongHighlight(int toggle);
     void slot_toggle3DView(const bool);
     void slot_togglePanel();
-    void slot_roomSize(int d);
-    void slot_exitSize(int d);
+    void slot_setMapperPanelVisible(bool panelVisible);
+    void slot_roomSize(int size);
+    void slot_exitSize(int size);
+    void slot_setShowRoomIds(bool showRoomIds);
+    void slot_setShowGrid(bool showGrid);
     void slot_updateInfoContributors();
-#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 15, 0))
-    // Only used in newer Qt versions
     void slot_switchArea(const int);
-#endif
+    void slot_setupMapperMenu();
+    void slot_toggleUpperLowerLevels(bool enabled);
+    void slot_toggleShowRoomIDsFromMenu(bool enabled);
+    void updateInfoMenu();
+
+    static void paintMapInfo(const QElapsedTimer& renderTimer, QPainter& painter, Host* pHost, TMap* pMap,
+                            int roomID, int displayAreaId, int selectionSize, QColor& infoColor,
+                            int xOffset, int yOffset, int widgetWidth, int fontHeight);
+    static int paintMapInfoContributor(QPainter& painter, int xOffset, int yOffset,
+                                      const MapInfoProperties& properties, QColor bgColor, int fontHeight,
+                                      int widgetWidth);
 
 private:
     TMap* mpMap = nullptr;
     QPointer<Host> mpHost;
-    bool mShowDefaultArea = true;
+    QPointer<QMenu> mpInfoMenu;
+    bool mIs3DMode = false;
 };
 
 #endif // MUDLET_DLGMAPPER_H
