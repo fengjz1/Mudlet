@@ -13592,6 +13592,33 @@ void TLuaInterpreter::setMatches(lua_State* L)
 }
 
 // No documentation available in wiki - internal function
+void TLuaInterpreter::setMultiMatches(lua_State* L)
+{
+    if (!mMultiCaptureGroupList.empty()) {
+        int k = 1;       // Lua indexes start with 1 as a general convention
+        lua_newtable(L); //multimatches
+        for (auto mit = mMultiCaptureGroupList.begin(); mit != mMultiCaptureGroupList.end(); mit++, k++) {
+            // multimatches{ trigger_idx{ table_matches{ ... } } }
+            lua_pushnumber(L, k);
+            lua_newtable(L); //regex-value => table matches
+            int i = 1;       // Lua indexes start with 1 as a general convention
+            for (auto it = (*mit).begin(); it != (*mit).end(); it++, i++) {
+                lua_pushnumber(L, i);
+                lua_pushstring(L, (*it).c_str());
+                lua_settable(L, -3); //match in matches
+            }
+            for (auto[name, capture]: mMultiCaptureNameGroups.value(k - 1)) {
+                lua_pushstring(L, name.toUtf8().constData());
+                lua_pushstring(L, capture.toUtf8().constData());
+                lua_settable(L, -3);
+            }
+            lua_settable(L, -3); //matches in regex
+        }
+        lua_setglobal(L, "multimatches");
+    }
+}
+
+// No documentation available in wiki - internal function
 bool TLuaInterpreter::call_luafunction(void* pT)
 {
     lua_State* L = pGlobalLua;
@@ -13599,6 +13626,7 @@ bool TLuaInterpreter::call_luafunction(void* pT)
     lua_gettable(L, LUA_REGISTRYINDEX);
     if (lua_isfunction(L, -1)) {
         setMatches(L);
+        setMultiMatches(L);
         int error = lua_pcall(L, 0, LUA_MULTRET, 0);
         if (error) {
             int nbpossible_errors = lua_gettop(L);
@@ -13671,6 +13699,7 @@ std::pair<bool, bool> TLuaInterpreter::callLuaFunctionReturnBool(void* pT)
 
     if (lua_isfunction(L, -1)) {
         setMatches(L);
+        setMultiMatches(L);
         int error = lua_pcall(L, 0, LUA_MULTRET, 0);
         if (error) {
             int nbpossible_errors = lua_gettop(L);
